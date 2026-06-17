@@ -39,3 +39,17 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# SQLite local databases
+*.db
+*.db-journal
+*.db-wal
+
+# Agent directories and lockfiles
+.agents/
+skills-lock.json
+
+# Local uploads
+public/uploads/
+
+

@@ -1,0 +1,24 @@
+'use server'
+
+import { signIn } from '@/auth'
+import { AuthError } from 'next-auth'
+
+export async function authenticate(
+  prevState: string | undefined,
+  formData: FormData
+) {
+  try {
+    await signIn('credentials', Object.fromEntries(formData))
+    return undefined
+  } catch (error) {
+    if (error instanceof AuthError) {
+      switch (error.type) {
+        case 'CredentialsSignin':
+          return 'Credenciais inválidas. Verifique seu email e senha.'
+        default:
+          return 'Ocorreu um erro no login. Tente novamente.'
+      }
+    }
+    throw error
+  }
+}

@@ -1,0 +1,239 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Models ──────────────────────────────────────────────
+
+model User {
+  id            String         @id @default(uuid())
+  name          String
+  email         String         @unique
+  passwordHash  String         @map("password_hash")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  students      Student[]
+  subjects      Subject[]
+  lessons       Lesson[]
+  payments      Payment[]
+  exams         Exam[]
+  grades        Grade[]
+  expenses      Expense[]
+  materials     Material[]
+  packages      Package[]
+  notifications Notification[]
+
+  @@map("users")
+}
+
+model Student {
+  id          String           @id @default(uuid())
+  userId      String           @map("user_id")
+  user        User             @relation(fields: [userId], references: [id])
+  name        String
+  parentName  String?          @map("parent_name")
+  parentPhone String?          @map("parent_phone")
+  email       String?
+  school      String?
+  age         Int?
+  gradeLevel  String?          @map("grade_level")
+  notes       String?
+  active      Boolean          @default(true)
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  subjects    StudentSubject[]
+  lessons     Lesson[]
+  exams       Exam[]
+  grades      Grade[]
+  packages    Package[]
+
+  @@map("students")
+}
+
+model Subject {
+  id        String           @id @default(uuid())
+  userId    String           @map("user_id")
+  user      User             @relation(fields: [userId], references: [id])
+  name      String
+  color     String           @default("#6366f1")
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  students  StudentSubject[]
+  lessons   Lesson[]
+  materials Material[]
+  exams     Exam[]
+  grades    Grade[]
+  packages  Package[]
+
+  @@unique([userId, name])
+  @@map("subjects")
+}
+
+model StudentSubject {
+  id        String  @id @default(uuid())
+  studentId String  @map("student_id")
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subjectId String  @map("subject_id")
+  subject   Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, subjectId])
+  @@map("student_subjects")
+}
+
+model Lesson {
+  id                String    @id @default(uuid())
+  userId            String    @map("user_id")
+  user              User      @relation(fields: [userId], references: [id])
+  studentId         String    @map("student_id")
+  student           Student   @relation(fields: [studentId], references: [id])
+  subjectId         String    @map("subject_id")
+  subject           Subject   @relation(fields: [subjectId], references: [id])
+  packageId         String?   @map("package_id")
+  package           Package?  @relation(fields: [packageId], references: [id])
+  date              DateTime
+  startTime         DateTime  @map("start_time")
+  durationHours     Float     @map("duration_hours")
+  value             Float
+  modality          String    // PRESENCIAL, ONLINE
+  status            String    @default("AGENDADA") // AGENDADA, CONCLUIDA, CANCELADA
+  recurrence        String?   // SEMANAL, QUINZENAL, MENSAL
+  recurrenceGroupId String?   @map("recurrence_group_id")
+  notes             String?
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  payment           Payment?
+
+  @@index([date])
+  @@index([status])
+  @@index([recurrenceGroupId])
+  @@map("lessons")
+}
+
+model Payment {
+  id            String    @id @default(uuid())
+  lessonId      String    @unique @map("lesson_id")
+  lesson        Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  userId        String    @map("user_id")
+  user          User      @relation(fields: [userId], references: [id])
+  amount        Float
+  isPaid        Boolean   @default(false) @map("is_paid")
+  paidAt        DateTime? @map("paid_at")
+  paymentMethod String?   @map("payment_method") // PIX, DINHEIRO, TRANSFERENCIA, OUTRO
+  notes         String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  @@index([isPaid])
+  @@map("payments")
+}
+
+model Package {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  user         User     @relation(fields: [userId], references: [id])
+  studentId    String   @map("student_id")
+  student      Student  @relation(fields: [studentId], references: [id])
+  subjectId    String   @map("subject_id")
+  subject      Subject  @relation(fields: [subjectId], references: [id])
+  name         String
+  totalLessons Int      @map("total_lessons")
+  totalValue   Float    @map("total_value")
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  lessons      Lesson[]
+
+  @@map("packages")
+}
+
+model Exam {
+  id        String   @id @default(uuid())
+  studentId String   @map("student_id")
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subjectId String   @map("subject_id")
+  subject   Subject  @relation(fields: [subjectId], references: [id])
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id])
+  title     String
+  examDate  DateTime @map("exam_date")
+  score     Float?
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([examDate])
+  @@map("exams")
+}
+
+model Grade {
+  id        String   @id @default(uuid())
+  studentId String   @map("student_id")
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subjectId String   @map("subject_id")
+  subject   Subject  @relation(fields: [subjectId], references: [id])
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id])
+  period    String
+  score     Float
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([studentId, subjectId, period])
+  @@map("grades")
+}
+
+model Expense {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  user        User     @relation(fields: [userId], references: [id])
+  description String
+  amount      Float
+  date        DateTime
+  category    String   // MATERIAL, TRANSPORTE, SOFTWARE, OUTRO
+  notes       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([date])
+  @@map("expenses")
+}
+
+model Material {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  user        User     @relation(fields: [userId], references: [id])
+  subjectId   String   @map("subject_id")
+  subject     Subject  @relation(fields: [subjectId], references: [id])
+  title       String
+  schoolYear  String   @map("school_year")
+  description String?
+  type        String   // FOTO, SCAN, PDF, DOCUMENTO
+  fileUrl     String   @map("file_url")
+  fileName    String   @map("file_name")
+  fileSize    Int      @map("file_size")
+  mimeType    String   @map("mime_type")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([subjectId, schoolYear])
+  @@map("materials")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id])
+  type      String   // AULA_HOJE, PAGAMENTO_PENDENTE, PROVA_PROXIMA, SISTEMA
+  title     String
+  message   String
+  isRead    Boolean  @default(false) @map("is_read")
+  metadata  String?  // JSON string
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([isRead, createdAt])
+  @@map("notifications")
+}
