@@ -1,29 +1,27 @@
 'use client'
 
-import { useActionState, useEffect, useState } from 'react'
-import { authenticate } from '@/actions/auth'
+import { useActionState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { registerUser } from '@/actions/auth'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
-import { GraduationCap, Loader2 } from 'lucide-react'
+import { GraduationCap, Loader2, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 
-export default function LoginPage() {
-  const [errorMessage, dispatch, isPending] = useActionState(
-    authenticate,
+export default function RegisterPage() {
+  const router = useRouter()
+  const [state, dispatch, isPending] = useActionState(
+    registerUser,
     undefined
   )
-  const [registered, setRegistered] = useState(false)
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search)
-      if (params.get('registered') === 'true') {
-        setRegistered(true)
-      }
+    if (state?.success) {
+      router.push('/login?registered=true')
     }
-  }, [])
+  }, [state, router])
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-radial from-slate-900 via-slate-950 to-black p-4">
@@ -41,26 +39,34 @@ export default function LoginPage() {
             </div>
           </div>
           <CardTitle className="text-3xl font-extrabold tracking-tight text-white">
-            IS-CAP
+            Cadastro
           </CardTitle>
           <CardDescription className="text-slate-400 text-sm">
-            Sistema de Controle de Aulas Particulares
+            Crie sua conta no IS-CAP para começar
           </CardDescription>
         </CardHeader>
 
         <form action={dispatch}>
           <CardContent className="space-y-4 pt-4">
-            {registered && (
-              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-lg text-sm text-center font-medium animate-fade-in">
-                Cadastro realizado com sucesso! Faça login para entrar.
+            {state?.error && (
+              <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg text-sm text-center">
+                {state.error}
               </div>
             )}
 
-            {errorMessage && (
-              <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg text-sm text-center">
-                {errorMessage}
-              </div>
-            )}
+            <div className="space-y-2">
+              <Label htmlFor="name" className="text-slate-300 text-xs font-semibold uppercase tracking-wider">
+                Nome Completo
+              </Label>
+              <Input
+                id="name"
+                name="name"
+                type="text"
+                placeholder="Professor Exemplo"
+                required
+                className="bg-slate-950/50 border-slate-800 text-white placeholder-slate-500 focus-visible:ring-indigo-500/50 focus-visible:border-indigo-500"
+              />
+            </div>
 
             <div className="space-y-2">
               <Label htmlFor="email" className="text-slate-300 text-xs font-semibold uppercase tracking-wider">
@@ -89,6 +95,20 @@ export default function LoginPage() {
                 className="bg-slate-950/50 border-slate-800 text-white placeholder-slate-500 focus-visible:ring-indigo-500/50 focus-visible:border-indigo-500"
               />
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword" className="text-slate-300 text-xs font-semibold uppercase tracking-wider">
+                Confirmar Senha
+              </Label>
+              <Input
+                id="confirmPassword"
+                name="confirmPassword"
+                type="password"
+                placeholder="••••••••"
+                required
+                className="bg-slate-950/50 border-slate-800 text-white placeholder-slate-500 focus-visible:ring-indigo-500/50 focus-visible:border-indigo-500"
+              />
+            </div>
           </CardContent>
 
           <CardFooter className="flex flex-col gap-4 pb-8">
@@ -100,20 +120,21 @@ export default function LoginPage() {
               {isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Entrando no sistema...
+                  Criando conta...
                 </>
               ) : (
-                'Entrar'
+                'Cadastrar'
               )}
             </Button>
-            <div className="text-xs text-slate-500 text-center">
-              Não tem uma conta?{' '}
-              <Link href="/register" className="text-indigo-400 hover:text-indigo-300 font-semibold transition-colors">
-                Cadastre-se
+            
+            <div className="text-sm text-center">
+              <Link 
+                href="/login" 
+                className="text-indigo-400 hover:text-indigo-300 transition-colors flex items-center justify-center gap-2 text-xs font-medium"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                Já tem uma conta? Entrar
               </Link>
-            </div>
-            <div className="text-xs text-slate-500 text-center">
-              Acesso exclusivo para professores autorizados.
             </div>
           </CardFooter>
         </form>
@@ -121,4 +142,3 @@ export default function LoginPage() {
     </div>
   )
 }
-
