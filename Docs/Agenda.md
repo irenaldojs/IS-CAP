@@ -124,107 +124,71 @@ model Lesson {
 *   **Alterar recorrência global**:
     *   O usuário seleciona a opção "Editar Agendamento Semanal" na aula ou no perfil do aluno.
     *   Ao alterar as definições principais (ex: mudou de terça às 14:00 para quarta às 16:00), o sistema atualiza o `RecurringSchedule`.
-    *   O sistema localiza todas as instâncias futuras de `Lesson` vinculadas àquela recorrência que ainda estão com status `AGENDADA` e as atualiza para o novo dia/hora. Aulas já `CONCLUIDAS` ou `CANCELADAS` no passado são preservadas por razões de integridade histórica e financeira.
+    *   O sistema localiza todas as instâncias futuras de `Lesson` vinculadas àquela recorrência que ainda estão com status `AGENDADA` e as atualiza para o novo dia/## 4. Dashboard Semanal e Fluxo de Funcionamento Atual
+
+A tela de agenda foi simplificada e otimizada para oferecer um fluxo de trabalho rápido e de alta densidade de informação:
+
+### A. Estrutura de Abas (Modos de Visualização)
+Substituímos os filtros e botões de alternância antigos por exatamente **3 abas de controle de visualização unificadas**:
+1.  **Hoje**: Exibe apenas as aulas do dia atual no formato de lista (`list`). É o modo padrão ao abrir a tela.
+2.  **Calendário**: Mostra a grade semanal no formato de calendário (`calendar`). Carrega apenas as aulas da semana selecionada, com suporte a botões de navegação de "Semana Anterior" e "Próxima Semana" (que alteram a data na URL e carregam as aulas correspondentes).
+3.  **Próximas**: Exibe uma lista (`list`) com as aulas dos **próximos 7 dias** (inclusive), com um limite máximo de **10 aulas**.
+
+### B. Grade Horária Semanal Compacta
+Para garantir que a maior parte da agenda caiba na tela sem rolagem vertical, aplicamos as seguintes regras:
+*   **Altura das Horas**: Reduzimos a escala visual de `68px` para **`45px` por hora** (grade das 07:00 às 21:00).
+*   **Dimensões de Cabeçalhos**: A altura do cabeçalho dos dias da semana é de `h-10` e a largura da coluna lateral de horas é de `w-12`.
+*   **Cards Inteligentes e Adaptativos**: Caso a aula possua duração menor ou o espaço seja curto (altura visual menor que `70px` no grid):
+    *   O rodapé (modalidade) e a linha de duração inferior são ocultados.
+    *   O horário de início (ex: `15:00`) é embutido diretamente na primeira linha ao lado do nome da matéria.
+
+### C. Integração e Cadastro de Alunos (Sincronização de Agenda Fixa)
+Quando um aluno é cadastrado ou editado com a opção de "Agenda Fixa (Aula Recorrente)" ativada:
+1.  O sistema executa a Server Action pai (`createStudent` ou `updateStudent`).
+2.  O sistema chama internamente as funções diretas de banco de dados (`createRecurringScheduleDb` ou `updateRecurringScheduleDb`), passando o `userId` autenticado. Isso evita erros de escopo de requisição (`headers was called outside a request scope`) que ocorriam ao aninhar Server Actions.
+3.  A recorrência master é criada e as instâncias de `Lesson` e `Payment` são geradas automaticamente para as **próximas 8 semanas** no calendário.
 
 ---
 
-## 4. Dashboard Semanal Interativo (Calendário)
-
-A visualização principal da agenda passará de um calendário mensal estático com lista lateral para um **Dashboard Semanal Interativo do Calendário** de alto impacto visual e de fácil interação para o professor no dia a dia.
-
-### Layout e Interface Visual
-O painel semanal utilizará a identidade premium do aplicativo (tons escuros, azul/indigo, bordas arredondadas e efeito de glassmorphism):
-
-*   **Grade Semanal Estilo Agenda**:
-    *   **Colunas**: Representam os dias da semana (Segunda a Sábado ou Domingo a Domingo, configurável).
-    *   **Linhas**: Divisões por hora em intervalos de 30 minutos ou 1 hora (ex: 07:00 às 22:00).
-    *   **Indicador de Linha de Tempo Atual**: Uma linha vermelha horizontal sutil com efeito luminoso que se move em tempo real indicando a hora atual.
-*   **Cards de Aulas Altamente Informativos**:
-    *   As aulas são desenhadas como blocos posicionados de acordo com o horário de início e duração na grade.
-    *   **Cores do Card**: O fundo sutil do bloco adota a cor da matéria (`Subject.color` com transparência/opacity de 15% para manter a elegibilidade da UI escura) com uma borda lateral grossa na cor cheia.
-    *   **Status**: Badges discretas ou ícones indicam se a aula está `AGENDADA` (azul), `CONCLUIDA` (verde) ou `CANCELADA` (vermelho riscado).
-    *   **Modalidade**: Um pequeno ícone de câmera (Video/Sky) para ONLINE ou pin de localização (MapPin/Amber) para PRESENCIAL.
-    *   **Valor**: Exibição discreta do preço da aula no canto inferior.
-
-### Interações Visuais (UX/UI)
-1.  **Arrastar e Soltar (Drag & Drop)**:
-    *   Permite mover um card de aula para outro horário ou dia da semana na mesma grade.
-    *   Ao soltar o card, um modal de confirmação aparece perguntando:
-        > ℹ️ *Esta aula faz parte de um agendamento semanal recorrente.*
-        > *   **[Alterar Apenas Esta Semana]** - Altera o dia/horário somente da aula deste dia específico.
-        > *   **[Alterar Toda a Recorrência]** - Altera o horário de todas as futuras aulas deste horário fixo.
-2.  **Clique Rápido (Menu de Contexto / Popover)**:
-    *   Ao dar um único clique em uma aula, abre-se um popover flutuante rápido contendo ações rápidas sem precisar abrir o formulário completo:
-        *   ✅ **Concluir Aula**: Altera o status para `CONCLUIDA` instantaneamente.
-        *   ❌ **Cancelar Esta Semana**: Cancela a aula selecionada mantendo a série.
-        *   🕒 **Reagendar Esta Semana**: Abre um painel rápido para alterar a hora/data apenas daquela instância.
-        *   ✏️ **Editar Detalhes**: Abre o modal completo para alterar observações, valores ou alunos.
-3.  **Clique em Slot Vazio**:
-    *   Ao clicar em qualquer espaço vazio no calendário semanal (ex: Quinta-feira às 15:00), o modal "Agendar Nova Aula" abre automaticamente preenchido com a data e horário clicados, acelerando o fluxo de trabalho do professor.
-4.  **Resumo Financeiro e de Horas do Topo**:
-    *   No cabeçalho do calendário semanal, exibe-se um resumo rápido da semana selecionada:
-        *   **Total de Aulas Planejadas**: Ex. 15 aulas.
-        *   **Receita Projetada**: Soma de todas as aulas `AGENDADA` e `CONCLUIDA`.
-        *   **Horas de Aula**: Total de horas de aula reservadas na semana.
-
----
-
-## 5. Mockup / Estrutura Visual do Dashboard Semanal
+## 5. Mockup da Estrutura Atual da Agenda
 
 ```
-+---------------------------------------------------------------------------------------------------------+
-|                                           AGENDA DE AULAS                                               |
-|  [ < Anterior ]  Semana de 22 a 28 de Junho, 2026  [ Próxima > ]             [ + Agendar Aula (Avulsa/Sem) ]|
-|  Filtros: [ Todos ] [ Online ] [ Presencial ]   |   Resumo: 12 Aulas (18h) • R$ 960,00 Projetados       |
-+---------------------------------------------------------------------------------------------------------+
-| HORA  | SEG (22)       | TER (23)       | QUA (24)       | QUI (25)       | SEX (26)       | SÁB (27)       |
-+-------+----------------+----------------+----------------+----------------+----------------+----------------+
-| 08:00 |                |                |                |                |                |                |
-+-------+----------------+----------------+----------------+----------------+----------------+----------------+
-| 09:00 | [Matemática]   |                | [Matemática]   |                |                |                |
-|       | Aluno: João    |                | Aluno: João    |                |                |                |
-|       | 09:00 - 10:30  |                | 09:00 - 10:30  |                |                |                |
-|       | (Semanal)      |                | (Semanal)      |                |                |                |
-+-------+----------------+----------------+----------------+----------------+----------------+----------------+
-| 10:00 |                |                |                |                |                |                |
-+-------+----------------+----------------+----------------+----------------+----------------+----------------+
-| 11:00 |                | [Física]       |                |                | [Física]       |                |
-|       |                | Aluna: Maria   |                |                | Aluna: Maria   |                |
-|       |                | 11:00 - 12:30  |                |                | (CANCELADA)    |                |
-|       |                | (Exceção-Muda) |                |                | (Semanal)      |                |
-+-------+----------------+----------------+----------------+----------------+----------------+----------------+
-| 12:00 |                |                |                |                |                |                |
-+-------+----------------+----------------+----------------+----------------+----------------+----------------+
-| ...   |                |                |                |                |                |                |
-+-------+----------------+----------------+----------------+----------------+----------------+----------------+
-| 15:00 |                |                |                | [História]     |                |                |
-|       |                |                |                | Aluna: Ana     |                |                |
-|       |                |                |                | 15:00 - 16:30  |                |                |
-|       |                |                |                | (Avulso)       |                |                |
-+---------------------------------------------------------------------------------------------------------+
++-----------------------------------------------------------------------------+
+|                              AGENDA DE AULAS                                |
+|  [ Hoje (Lista) ]  [ Calendário (Semana) ]  [ Próximas (7 dias) ]           |
+|                                                     [ + Agendar Aula ]      |
++-----------------------------------------------------------------------------+
+|  <- Anterior   |  Semana de 22 a 28 de Junho de 2026  |  Próxima ->          |
+|  Resumo: 12 Aulas (18h) • R$ 960,00 Projetados                              |
++-----------------------------------------------------------------------------+
+| HORA | SEG (22)  | TER (23)  | QUA (24)  | QUI (25)  | SEX (26)  | SÁB (27)     |
++------+-----------+-----------+-----------+-----------+-----------+--------------+
+| 08:00|           |           |           |           |           |              |
++------+-----------+-----------+-----------+-----------+-----------+--------------+
+| 09:00| [MAT 9:00]|           | [MAT 9:00]|           |           |              |
+|      | João      |           | João      |           |           |              |
++------+-----------+-----------+-----------+-----------+-----------+--------------+
+| 10:00|           |           |           |           |           |              |
++------+-----------+-----------+-----------+-----------+-----------+--------------+
+| 11:00|           | [FIS]     |           |           | [FIS]     |              |
+|      |           | Maria     |           |           | (CANCEL.) |              |
+|      |           | 11:00(1.5)|           |           | Maria     |              |
++------+-----------+-----------+-----------+-----------+-----------+--------------+
 ```
 
 ---
 
-## 6. Passos para Implementação Técnica
+## 6. Lógica de Interações e Exceções
 
-### Fase 1: Atualização da Modelagem de Dados
-1.  Criar a tabela `RecurringSchedule` no Prisma Schema.
-2.  Relacionar `Lesson` com `RecurringSchedule` por meio de `recurringScheduleId`.
-3.  Executar `prisma migrate dev` para atualizar a estrutura na base PostgreSQL.
+*   **Clique em Slot Vazio**: Ao clicar em qualquer espaço de hora livre (ex: Quinta-feira às 15:00), o modal "Agendar Nova Aula" abre pré-preenchido com o dia e hora correspondentes.
+*   **Edição/Exclusão de Recorrências**: Ao clicar em uma aula recorrente, o professor pode optar por aplicar a alteração:
+    *   **Apenas esta semana**: Altera ou exclui somente a instância selecionada (ex: marca como cancelada ou muda o horário pontualmente).
+    *   **Toda a recorrência**: Modifica todas as futuras aulas vinculadas àquela recorrência a partir da data da alteração.
+*   **Status Rápido**: Ao passar o mouse sobre o card da aula, botões rápidos de ação flutuam na tela para concluir ou cancelar a aula sem precisar abrir o modal de detalhes.
 
-### Fase 2: Desenvolvimento das Server Actions (Lógica de Negócio)
-1.  Desenvolver as ações de criação e atualização de recorrência (`createRecurringSchedule`, `updateRecurringSchedule`).
-2.  Criar rotina para instanciar/gerar aulas futuras com base na recorrência (para preencher o banco de dados).
-3.  Adaptar o formulário existente de cadastro de aula para incluir a opção "Recorrência" (Avulso vs Semanal).
-4.  Garantir que ao criar/editar uma aula individual vinculada a uma recorrência, seja possível alterar apenas aquela aula (`date`, `startTime`, `status`) ou toda a série.
+---
 
-### Fase 3: Construção do Dashboard Semanal (UI/UX)
-1.  Criar o componente de calendário semanal com grid de horários (utilizando CSS Grid ou Flexbox para layout responsivo premium).
-2.  Desenvolver lógica de posicionamento absoluto/CSS Grid dos blocos de aulas baseado em frações de hora e dia.
-3.  Implementar micro-interações: popover com clique rápido, cores dinâmicas e badges de status.
-4.  (Opcional avançado) Adicionar suporte a Drag and Drop (utilizando bibliotecas nativas de React como `@hello-pangea/dnd`, `@dnd-kit` ou API HTML5 standard).
+## 7. Integração de Relatórios e Auditoria
 
-### Fase 4: Integração de Relatórios e Auditoria
 1.  Garantir que as estimativas e fluxos de caixa levem em consideração as aulas futuras com status `AGENDADA` e ignorem as aulas `CANCELADA`.
 2.  Testar se as aulas canceladas não adicionam pagamentos pendentes no fluxo de faturamento.
