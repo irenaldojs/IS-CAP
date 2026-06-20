@@ -185,8 +185,8 @@ export async function getSubjects() {
   })
 }
 
-// 7. Criar Agendamento Semanal (Recorrência)
-export async function createRecurringSchedule(data: {
+// 7. Criar Agendamento Semanal (Recorrência) - Função direta de Banco de Dados
+export async function createRecurringScheduleDb(userId: string, data: {
   studentId: string
   subjectId: string
   startDate: Date | string
@@ -195,9 +195,6 @@ export async function createRecurringSchedule(data: {
   modality: string
   notes?: string | null
 }) {
-  const session = await auth()
-  if (!session?.user?.id) throw new Error('Não autorizado')
-
   const firstDate = new Date(data.startDate)
   const dayOfWeek = firstDate.getDay()
   const timeString = firstDate.toTimeString().split(' ')[0].substring(0, 5) // HH:MM
@@ -205,7 +202,7 @@ export async function createRecurringSchedule(data: {
   // 1. Cria a recorrência master
   const schedule = await prisma.recurringSchedule.create({
     data: {
-      userId: session.user.id,
+      userId,
       studentId: data.studentId,
       subjectId: data.subjectId,
       dayOfWeek,
@@ -231,7 +228,7 @@ export async function createRecurringSchedule(data: {
 
     const lesson = await prisma.lesson.create({
       data: {
-        userId: session.user.id,
+        userId,
         studentId: data.studentId,
         subjectId: data.subjectId,
         date: dateOnly,
@@ -249,7 +246,7 @@ export async function createRecurringSchedule(data: {
     // Cria o pagamento pendente correspondente
     await prisma.payment.create({
       data: {
-        userId: session.user.id,
+        userId,
         lessonId: lesson.id,
         amount: lesson.value,
         isPaid: false,
@@ -257,13 +254,31 @@ export async function createRecurringSchedule(data: {
     }).catch((err) => console.error('Erro ao criar pagamento recorrente:', err))
   }
 
+  return schedule
+}
+
+export async function createRecurringSchedule(data: {
+  studentId: string
+  subjectId: string
+  startDate: Date | string
+  durationHours: number
+  value: number
+  modality: string
+  notes?: string | null
+}) {
+  const session = await auth()
+  if (!session?.user?.id) throw new Error('Não autorizado')
+
+  const schedule = await createRecurringScheduleDb(session.user.id, data)
+
   revalidatePath('/dashboard/agenda')
   revalidatePath('/dashboard')
   return schedule
 }
 
-// 8. Atualizar Agendamento Semanal (Recorrência)
-export async function updateRecurringSchedule(
+// 8. Atualizar Agendamento Semanal (Recorrência) - Função direta de Banco de Dados
+export async function updateRecurringScheduleDb(
+  userId: string,
   id: string,
   data: {
     dayOfWeek: number
@@ -273,9 +288,6 @@ export async function updateRecurringSchedule(
     modality: string
   }
 ) {
-  const session = await auth()
-  if (!session?.user?.id) throw new Error('Não autorizado')
-
   // 1. Atualiza a recorrência master
   const schedule = await prisma.recurringSchedule.update({
     where: { id },
@@ -337,16 +349,31 @@ export async function updateRecurringSchedule(
     }
   }
 
+  return schedule
+}
+
+export async function updateRecurringSchedule(
+  id: string,
+  data: {
+    dayOfWeek: number
+    startTime: string
+    durationHours: number
+    value: number
+    modality: string
+  }
+) {
+  const session = await auth()
+  if (!session?.user?.id) throw new Error('Não autorizado')
+
+  const schedule = await updateRecurringScheduleDb(session.user.id, id, data)
+
   revalidatePath('/dashboard/agenda')
   revalidatePath('/dashboard')
   return schedule
 }
 
-// 9. Deletar Agendamento Semanal (Recorrência)
-export async function deleteRecurringSchedule(id: string) {
-  const session = await auth()
-  if (!session?.user?.id) throw new Error('Não autorizado')
-
+// 9. Deletar Agendamento Semanal (Recorrência) - Função direta de Banco de Dados
+export async function deleteRecurringScheduleDb(userId: string, id: string) {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
@@ -364,10 +391,20 @@ export async function deleteRecurringSchedule(id: string) {
     where: { id },
   })
 
+  return schedule
+}
+
+export async function deleteRecurringSchedule(id: string) {
+  const session = await auth()
+  if (!session?.user?.id) throw new Error('Não autorizado')
+
+  const schedule = await deleteRecurringScheduleDb(session.user.id, id)
+
   revalidatePath('/dashboard/agenda')
   revalidatePath('/dashboard')
   return schedule
 }
+
 
 // 10. Obter Agendamentos Semanais do Usuário
 export async function getRecurringSchedules() {

@@ -3,6 +3,11 @@
 import prisma from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { auth } from '@/auth'
+import { 
+  createRecurringScheduleDb, 
+  updateRecurringScheduleDb, 
+  deleteRecurringScheduleDb 
+} from './lessons'
 
 // Tipo para criação de estudante
 export interface StudentInput {
@@ -22,6 +27,103 @@ export interface StudentInput {
   fixedScheduleTemporarilyDisabled?: boolean
 }
 
+// Helpers para sincronização de Agenda Fixa
+function mapDayStringToNumber(dayStr: string): number {
+  switch (dayStr.toLowerCase()) {
+    case 'domingo': return 0;
+    case 'segunda-feira': case 'segunda': return 1;
+    case 'terça-feira': case 'terça': return 2;
+    case 'quarta-feira': case 'quarta': return 3;
+    case 'quinta-feira': case 'quinta': return 4;
+    case 'sexta-feira': case 'sexta': return 5;
+    case 'sábado': case 'sabado': return 6;
+    default: return 1;
+  }
+}
+
+function getNextDayOfWeekDate(dayOfWeek: number, timeStr: string): Date {
+  const now = new Date()
+  const [hours, minutes] = (timeStr || '14:00').split(':').map(Number)
+  
+  const resultDate = new Date()
+  resultDate.setHours(hours, minutes, 0, 0)
+  
+  const currentDay = now.getDay()
+  let daysToAdd = (dayOfWeek - currentDay + 7) % 7
+  
+  if (daysToAdd === 0 && resultDate.getTime() <= now.getTime()) {
+    daysToAdd = 7
+  }
+  
+  resultDate.setDate(resultDate.getDate() + daysToAdd)
+  return resultDate
+}
+
+async function syncStudentFixedSchedule(studentId: string, userId: string, data: StudentInput) {
+  // Procura se já existe uma recorrência para este aluno
+  const existingSchedule = await prisma.recurringSchedule.findFirst({
+    where: { studentId },
+  })
+
+  if (data.fixedScheduleActive) {
+    const dayOfWeek = mapDayStringToNumber(data.fixedScheduleDay || 'Segunda-feira')
+    const timeStr = data.fixedScheduleTime || '14:00'
+    const value = data.fixedSchedulePrice ? Number(data.fixedSchedulePrice) : 80
+    const modality = 'ONLINE'
+
+    // Localiza ou cria matéria para vincular
+    let subjectId = ''
+    const studentSub = await prisma.studentSubject.findFirst({
+      where: { studentId },
+    })
+
+    if (studentSub) {
+      subjectId = studentSub.subjectId
+    } else {
+      let sub = await prisma.subject.findFirst({
+        where: { userId },
+      })
+      if (!sub) {
+        sub = await prisma.subject.create({
+          data: {
+            userId,
+            name: 'Geral',
+            color: '#6366f1',
+          },
+        })
+      }
+      subjectId = sub.id
+      await prisma.studentSubject.create({
+        data: { studentId, subjectId }
+      }).catch(() => {})
+    }
+
+    if (existingSchedule) {
+      await updateRecurringScheduleDb(userId, existingSchedule.id, {
+        dayOfWeek,
+        startTime: timeStr,
+        durationHours: 1.5,
+        value,
+        modality,
+      })
+    } else {
+      const startDate = getNextDayOfWeekDate(dayOfWeek, timeStr)
+      await createRecurringScheduleDb(userId, {
+        studentId,
+        subjectId,
+        startDate,
+        durationHours: 1.5,
+        value,
+        modality,
+      })
+    }
+  } else {
+    if (existingSchedule) {
+      await deleteRecurringScheduleDb(userId, existingSchedule.id)
+    }
+  }
+}
+
 // 1. Criar Aluno
 export async function createStudent(data: StudentInput) {
   const session = await auth()
@@ -33,7 +135,6 @@ export async function createStudent(data: StudentInput) {
   try {
     console.log('[Server Action] createStudent: Tentando cadastrar aluno com dados:', JSON.stringify(data))
 
-    // Verifica se o usuário correspondente à sessão realmente existe no banco de dados
     const userExists = await prisma.user.findUnique({
       where: { id: session.user.id },
     })
@@ -63,6 +164,9 @@ export async function createStudent(data: StudentInput) {
       },
     })
 
+    // Sincroniza a Agenda Fixa com as Aulas do Calendário
+    await syncStudentFixedSchedule(student.id, session.user.id, data)
+
     console.log(`[Server Action] createStudent: Aluno cadastrado com sucesso! ID: ${student.id}`)
     revalidatePath('/dashboard/alunos')
     return student
@@ -85,7 +189,6 @@ export async function updateStudent(id: string, data: StudentInput) {
   try {
     console.log(`[Server Action] updateStudent: Tentando atualizar aluno ${id} com dados:`, JSON.stringify(data))
 
-    // Verifica se o usuário correspondente à sessão realmente existe no banco de dados
     const userExists = await prisma.user.findUnique({
       where: { id: session.user.id },
     })
@@ -113,6 +216,9 @@ export async function updateStudent(id: string, data: StudentInput) {
         fixedScheduleTemporarilyDisabled: data.fixedScheduleTemporarilyDisabled ?? false,
       },
     })
+
+    // Sincroniza a Agenda Fixa com as Aulas do Calendário
+    await syncStudentFixedSchedule(student.id, session.user.id, data)
 
     console.log(`[Server Action] updateStudent: Aluno cadastrado com sucesso! ID: ${student.id}`)
     revalidatePath('/dashboard/alunos')
