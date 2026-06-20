@@ -67,95 +67,65 @@ export function AgendaClient({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Cabeçalho */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white">Agenda de Aulas</h1>
-          <p className="text-muted-foreground mt-1">
+          <h1 className="text-2xl font-bold tracking-tight text-white">Agenda de Aulas</h1>
+          <p className="text-slate-400 text-xs mt-0.5">
             Gerencie seus agendamentos, horários de aulas e status das sessões pedagógicas.
           </p>
         </div>
         <Button
           onClick={() => setIsDialogOpen(true)}
-          size="lg"
-          className="bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer shadow-md shadow-indigo-600/15"
+          size="sm"
+          className="bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer shadow-md shadow-indigo-600/15 text-xs h-9"
         >
-          <Plus className="mr-2 size-4" />
+          <Plus className="mr-1.5 size-3.5" />
           Agendar Aula
         </Button>
       </div>
 
       {/* Barra de Filtros e Visualização */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-slate-900/40 p-2.5 rounded-xl border border-slate-800 backdrop-blur-md">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-slate-900/40 p-2 rounded-xl border border-slate-800/80 backdrop-blur-md">
         
-        {/* Filtros de Período */}
-        <div className="flex flex-wrap gap-1">
+        {/* Abas */}
+        <div className="flex gap-1.5 p-1 bg-slate-950/80 rounded-lg border border-slate-800/40 w-full sm:w-auto">
           <button
-            onClick={() => handlePeriodChange('all')}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-              period === 'all'
-                ? 'bg-slate-800 text-white border border-slate-700'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            Todas as Aulas
-          </button>
-          <button
-            onClick={() => handlePeriodChange('today')}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-              period === 'today'
-                ? 'bg-slate-800 text-white border border-slate-700'
-                : 'text-slate-400 hover:text-slate-200'
+            onClick={() => {
+              router.push(`/dashboard/agenda?view=list&period=today&date=${date}`)
+            }}
+            className={`flex-1 sm:flex-none px-4 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+              period === 'today' && view === 'list'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/40'
             }`}
           >
             Hoje
           </button>
           <button
-            onClick={() => handlePeriodChange('week')}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-              period === 'week'
-                ? 'bg-slate-800 text-white border border-slate-700'
-                : 'text-slate-400 hover:text-slate-200'
+            onClick={() => {
+              router.push(`/dashboard/agenda?view=calendar&period=week&date=${date}`)
+            }}
+            className={`flex-1 sm:flex-none px-4 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+              period === 'week' && view === 'calendar'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/40'
             }`}
           >
-            Esta Semana
+            Calendário
           </button>
           <button
-            onClick={() => handlePeriodChange('upcoming')}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-              period === 'upcoming'
-                ? 'bg-slate-800 text-white border border-slate-700'
-                : 'text-slate-400 hover:text-slate-200'
+            onClick={() => {
+              router.push(`/dashboard/agenda?view=list&period=upcoming&date=${date}`)
+            }}
+            className={`flex-1 sm:flex-none px-4 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+              period === 'upcoming' && view === 'list'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/40'
             }`}
           >
             Próximas
-          </button>
-        </div>
-
-        {/* Toggle Modo Visualização */}
-        <div className="flex items-center gap-1 border border-slate-800 bg-slate-950 p-1 rounded-lg self-end sm:self-auto">
-          <button
-            onClick={() => handleViewChange('list')}
-            className={`p-1.5 rounded-md transition-all cursor-pointer ${
-              view === 'list'
-                ? 'bg-indigo-600/20 text-indigo-400 font-bold'
-                : 'text-slate-400 hover:text-slate-300'
-            }`}
-            title="Visualização em Lista"
-          >
-            <List className="size-4" />
-          </button>
-          <button
-            onClick={() => handleViewChange('calendar')}
-            className={`p-1.5 rounded-md transition-all cursor-pointer ${
-              view === 'calendar'
-                ? 'bg-indigo-600/20 text-indigo-400 font-bold'
-                : 'text-slate-400 hover:text-slate-300'
-            }`}
-            title="Visualização em Calendário"
-          >
-            <CalendarIcon className="size-4" />
           </button>
         </div>
 

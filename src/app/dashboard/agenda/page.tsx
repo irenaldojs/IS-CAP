@@ -25,7 +25,7 @@ export default async function AgendaPage({ searchParams }: PageProps) {
 
   const resolvedParams = await searchParams
   const view = resolvedParams.view || 'list'
-  const period = resolvedParams.period || 'all'
+  const period = resolvedParams.period || 'today'
   const dateStr = resolvedParams.date || new Date().toISOString().split('T')[0]
   const editLessonId = resolvedParams.editLessonId
 
