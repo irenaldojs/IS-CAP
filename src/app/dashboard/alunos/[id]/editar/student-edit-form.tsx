@@ -5,7 +5,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { createStudent } from '@/actions/students'
+import { updateStudent } from '@/actions/students'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
@@ -41,7 +41,27 @@ const studentFormSchema = z.object({
 
 type StudentFormValues = z.infer<typeof studentFormSchema>
 
-export default function NovoAlunoPage() {
+interface StudentEditFormProps {
+  student: {
+    id: string
+    name: string
+    parentName: string | null
+    parentPhone: string | null
+    email: string | null
+    phone: string | null
+    school: string | null
+    age: number | null
+    gradeLevel: string | null
+    notes: string | null
+    fixedScheduleActive: boolean
+    fixedScheduleDay: string | null
+    fixedScheduleTime: string | null
+    fixedSchedulePrice: number | null
+    fixedScheduleTemporarilyDisabled: boolean
+  }
+}
+
+export function StudentEditForm({ student }: StudentEditFormProps) {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -52,27 +72,27 @@ export default function NovoAlunoPage() {
   } = useForm<StudentFormValues>({
     resolver: zodResolver(studentFormSchema) as any,
     defaultValues: {
-      name: '',
-      parentName: '',
-      parentPhone: '',
-      email: '',
-      phone: '',
-      school: '',
-      age: undefined,
-      gradeLevel: '',
-      notes: '',
-      fixedScheduleActive: false,
-      fixedScheduleDay: '',
-      fixedScheduleTime: '',
-      fixedSchedulePrice: undefined,
-      fixedScheduleTemporarilyDisabled: false,
+      name: student.name,
+      parentName: student.parentName || '',
+      parentPhone: student.parentPhone || '',
+      email: student.email || '',
+      phone: student.phone || '',
+      school: student.school || '',
+      age: student.age ?? undefined,
+      gradeLevel: student.gradeLevel || '',
+      notes: student.notes || '',
+      fixedScheduleActive: student.fixedScheduleActive ?? false,
+      fixedScheduleDay: student.fixedScheduleDay || '',
+      fixedScheduleTime: student.fixedScheduleTime || '',
+      fixedSchedulePrice: student.fixedSchedulePrice ?? undefined,
+      fixedScheduleTemporarilyDisabled: student.fixedScheduleTemporarilyDisabled ?? false,
     },
   })
 
   const onSubmit = async (values: StudentFormValues) => {
     setIsSubmitting(true)
     try {
-      await createStudent({
+      await updateStudent(student.id, {
         name: values.name,
         parentName: values.parentName || undefined,
         parentPhone: values.parentPhone || undefined,
@@ -88,11 +108,11 @@ export default function NovoAlunoPage() {
         fixedSchedulePrice: values.fixedSchedulePrice,
         fixedScheduleTemporarilyDisabled: values.fixedScheduleTemporarilyDisabled,
       })
-      toast.success('Aluno cadastrado com sucesso!')
-      router.push('/dashboard/alunos')
+      toast.success('Aluno atualizado com sucesso!')
+      router.push(`/dashboard/alunos/${student.id}`)
       router.refresh()
     } catch (error: any) {
-      const message = error?.message || 'Erro ao cadastrar aluno. Tente novamente.'
+      const message = error?.message || 'Erro ao atualizar aluno. Tente novamente.'
       toast.error(message)
     } finally {
       setIsSubmitting(false)
@@ -103,18 +123,18 @@ export default function NovoAlunoPage() {
     <div className="space-y-6">
       {/* Voltar */}
       <div className="flex items-center gap-2">
-        <Link href="/dashboard/alunos" className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), "text-slate-400 hover:text-white cursor-pointer")}>
+        <Link href={`/dashboard/alunos/${student.id}`} className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), "text-slate-400 hover:text-white cursor-pointer")}>
           <ArrowLeft className="mr-2 size-4" />
-          Voltar para lista
+          Voltar para detalhes
         </Link>
       </div>
 
       <div className="max-w-3xl mx-auto">
         <Card className="border-slate-800 bg-slate-900/20 backdrop-blur-md">
           <CardHeader>
-            <CardTitle className="text-xl font-bold text-white">Cadastrar Novo Aluno</CardTitle>
+            <CardTitle className="text-xl font-bold text-white">Editar Perfil do Aluno</CardTitle>
             <CardDescription className="text-slate-400">
-              Preencha os dados cadastrais abaixo para criar a ficha do aluno.
+              Modifique os campos abaixo para atualizar as informações do aluno.
             </CardDescription>
           </CardHeader>
           <form onSubmit={handleSubmit(onSubmit)}>
@@ -356,7 +376,7 @@ export default function NovoAlunoPage() {
               </div>
             </CardContent>
             <CardFooter className="flex items-center justify-end gap-3 border-t border-slate-800 bg-slate-950/20 px-6 py-4">
-              <Link href="/dashboard/alunos" className={cn(buttonVariants({ variant: 'outline' }), "cursor-pointer")}>
+              <Link href={`/dashboard/alunos/${student.id}`} className={cn(buttonVariants({ variant: 'outline' }), "cursor-pointer")}>
                 Cancelar
               </Link>
               <Button
@@ -372,7 +392,7 @@ export default function NovoAlunoPage() {
                 ) : (
                   <>
                     <Save className="mr-2 size-4" />
-                    Salvar Aluno
+                    Salvar Alterações
                   </>
                 )}
               </Button>

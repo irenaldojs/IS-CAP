@@ -36,6 +36,7 @@ export default async function DetalhesAlunoPage({ params }: PageProps) {
     parentName: student.parentName,
     parentPhone: student.parentPhone,
     email: student.email,
+    phone: student.phone,
     school: student.school,
     age: student.age,
     gradeLevel: student.gradeLevel,
@@ -68,16 +69,29 @@ export default async function DetalhesAlunoPage({ params }: PageProps) {
       </div>
 
       {/* Perfil Header */}
-      <div className="flex items-center gap-4 pb-4">
-        <div className="flex size-14 items-center justify-center rounded-xl bg-indigo-950 text-indigo-400 border border-indigo-900 shadow-lg">
-          <User className="size-7" />
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-slate-800/40">
+        <div className="flex items-center gap-4">
+          <div className="flex size-14 items-center justify-center rounded-xl bg-indigo-950 text-indigo-400 border border-indigo-900 shadow-lg">
+            <User className="size-7" />
+          </div>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">{student.name}</h1>
+            <p className="text-slate-400 text-sm mt-0.5">
+              {student.gradeLevel ? `${student.gradeLevel}` : 'Sem série definida'}
+              {student.school ? ` • ${student.school}` : ''}
+            </p>
+          </div>
         </div>
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">{student.name}</h1>
-          <p className="text-slate-400 text-sm mt-0.5">
-            {student.gradeLevel ? `${student.gradeLevel}` : 'Sem série definida'}
-            {student.school ? ` • ${student.school}` : ''}
-          </p>
+          <Link
+            href={`/dashboard/alunos/${student.id}/editar`}
+            className={cn(
+              buttonVariants({ variant: 'outline', size: 'sm' }),
+              "border-slate-850 bg-slate-900/40 text-slate-300 hover:text-white hover:bg-slate-900 cursor-pointer"
+            )}
+          >
+            Editar Perfil
+          </Link>
         </div>
       </div>
 

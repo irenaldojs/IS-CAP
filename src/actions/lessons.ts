@@ -42,6 +42,16 @@ export async function getLessons() {
           color: true,
         },
       },
+      recurringSchedule: {
+        select: {
+          id: true,
+          dayOfWeek: true,
+          startTime: true,
+          durationHours: true,
+          value: true,
+          modality: true,
+        },
+      },
     },
     orderBy: {
       date: 'asc',
@@ -49,7 +59,7 @@ export async function getLessons() {
   })
 }
 
-// 2. Criar Nova Aula
+// 2. Criar Nova Aula (Avulsa)
 export async function createLesson(data: LessonInput) {
   const session = await auth()
   if (!session?.user?.id) throw new Error('Não autorizado')
@@ -69,7 +79,7 @@ export async function createLesson(data: LessonInput) {
       value: Number(data.value),
       modality: data.modality,
       status: data.status || 'AGENDADA',
-      recurrence: data.recurrence || null,
+      recurrence: data.recurrence || 'AVULSA',
       notes: data.notes || null,
     },
   })
@@ -171,6 +181,209 @@ export async function getSubjects() {
     },
     orderBy: {
       name: 'asc',
+    },
+  })
+}
+
+// 7. Criar Agendamento Semanal (Recorrência)
+export async function createRecurringSchedule(data: {
+  studentId: string
+  subjectId: string
+  startDate: Date | string
+  durationHours: number
+  value: number
+  modality: string
+  notes?: string | null
+}) {
+  const session = await auth()
+  if (!session?.user?.id) throw new Error('Não autorizado')
+
+  const firstDate = new Date(data.startDate)
+  const dayOfWeek = firstDate.getDay()
+  const timeString = firstDate.toTimeString().split(' ')[0].substring(0, 5) // HH:MM
+
+  // 1. Cria a recorrência master
+  const schedule = await prisma.recurringSchedule.create({
+    data: {
+      userId: session.user.id,
+      studentId: data.studentId,
+      subjectId: data.subjectId,
+      dayOfWeek,
+      startTime: timeString,
+      durationHours: Number(data.durationHours),
+      value: Number(data.value),
+      modality: data.modality,
+      active: true,
+    },
+  })
+
+  // 2. Pré-gera 8 semanas de aulas
+  const dates = []
+  let current = new Date(firstDate)
+  for (let i = 0; i < 8; i++) {
+    dates.push(new Date(current))
+    current.setDate(current.getDate() + 7)
+  }
+
+  for (const lessonDate of dates) {
+    const dateOnly = new Date(lessonDate)
+    dateOnly.setHours(0, 0, 0, 0)
+
+    const lesson = await prisma.lesson.create({
+      data: {
+        userId: session.user.id,
+        studentId: data.studentId,
+        subjectId: data.subjectId,
+        date: dateOnly,
+        startTime: lessonDate,
+        durationHours: Number(data.durationHours),
+        value: Number(data.value),
+        modality: data.modality,
+        status: 'AGENDADA',
+        recurrence: 'SEMANAL',
+        recurringScheduleId: schedule.id,
+        notes: data.notes || null,
+      },
+    })
+
+    // Cria o pagamento pendente correspondente
+    await prisma.payment.create({
+      data: {
+        userId: session.user.id,
+        lessonId: lesson.id,
+        amount: lesson.value,
+        isPaid: false,
+      },
+    }).catch((err) => console.error('Erro ao criar pagamento recorrente:', err))
+  }
+
+  revalidatePath('/dashboard/agenda')
+  revalidatePath('/dashboard')
+  return schedule
+}
+
+// 8. Atualizar Agendamento Semanal (Recorrência)
+export async function updateRecurringSchedule(
+  id: string,
+  data: {
+    dayOfWeek: number
+    startTime: string
+    durationHours: number
+    value: number
+    modality: string
+  }
+) {
+  const session = await auth()
+  if (!session?.user?.id) throw new Error('Não autorizado')
+
+  // 1. Atualiza a recorrência master
+  const schedule = await prisma.recurringSchedule.update({
+    where: { id },
+    data: {
+      dayOfWeek: Number(data.dayOfWeek),
+      startTime: data.startTime,
+      durationHours: Number(data.durationHours),
+      value: Number(data.value),
+      modality: data.modality,
+    },
+  })
+
+  // 2. Atualiza futuras aulas agendadas (não concluídas ou canceladas)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const futureLessons = await prisma.lesson.findMany({
+    where: {
+      recurringScheduleId: id,
+      status: 'AGENDADA',
+      date: { gte: today },
+    },
+    orderBy: { date: 'asc' },
+  })
+
+  for (const lesson of futureLessons) {
+    const lessonDate = new Date(lesson.date)
+    const currentDay = lessonDate.getDay()
+    let daysToAdd = (data.dayOfWeek - currentDay + 7) % 7
+    if (daysToAdd !== 0) {
+      lessonDate.setDate(lessonDate.getDate() + daysToAdd)
+    }
+
+    const [hours, minutes] = data.startTime.split(':').map(Number)
+    const newStartTime = new Date(lessonDate)
+    newStartTime.setHours(hours, minutes, 0, 0)
+
+    const dateOnly = new Date(lessonDate)
+    dateOnly.setHours(0, 0, 0, 0)
+
+    await prisma.lesson.update({
+      where: { id: lesson.id },
+      data: {
+        date: dateOnly,
+        startTime: newStartTime,
+        durationHours: Number(data.durationHours),
+        value: Number(data.value),
+        modality: data.modality,
+      },
+    })
+
+    // Sincroniza pagamento pendente se existir
+    const payment = await prisma.payment.findUnique({ where: { lessonId: lesson.id } })
+    if (payment && !payment.isPaid) {
+      await prisma.payment.update({
+        where: { id: payment.id },
+        data: { amount: Number(data.value) },
+      }).catch(console.error)
+    }
+  }
+
+  revalidatePath('/dashboard/agenda')
+  revalidatePath('/dashboard')
+  return schedule
+}
+
+// 9. Deletar Agendamento Semanal (Recorrência)
+export async function deleteRecurringSchedule(id: string) {
+  const session = await auth()
+  if (!session?.user?.id) throw new Error('Não autorizado')
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  // Deleta as futuras aulas que ainda não foram ministradas
+  await prisma.lesson.deleteMany({
+    where: {
+      recurringScheduleId: id,
+      status: 'AGENDADA',
+      date: { gte: today },
+    },
+  })
+
+  // Remove o agendamento master
+  const schedule = await prisma.recurringSchedule.delete({
+    where: { id },
+  })
+
+  revalidatePath('/dashboard/agenda')
+  revalidatePath('/dashboard')
+  return schedule
+}
+
+// 10. Obter Agendamentos Semanais do Usuário
+export async function getRecurringSchedules() {
+  const session = await auth()
+  if (!session?.user?.id) return []
+
+  return prisma.recurringSchedule.findMany({
+    where: {
+      userId: session.user.id,
+    },
+    include: {
+      student: { select: { id: true, name: true } },
+      subject: { select: { id: true, name: true, color: true } },
+    },
+    orderBy: {
+      dayOfWeek: 'asc',
     },
   })
 }

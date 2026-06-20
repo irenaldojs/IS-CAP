@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { LessonDialog } from './lesson-dialog'
 import {
@@ -39,7 +39,17 @@ export function AgendaClient({
   children,
 }: AgendaClientProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+
+  const hasCreateDate = searchParams ? searchParams.has('createDate') : false
+
+  // Abre o modal de criação se os parâmetros de slot estiverem na URL
+  useEffect(() => {
+    if (hasCreateDate) {
+      setIsDialogOpen(true)
+    }
+  }, [hasCreateDate])
 
   const handlePeriodChange = (newPeriod: string) => {
     router.push(`/dashboard/agenda?view=${view}&period=${newPeriod}&date=${date}`)
@@ -47,6 +57,13 @@ export function AgendaClient({
 
   const handleViewChange = (newView: string) => {
     router.push(`/dashboard/agenda?view=${newView}&period=${period}&date=${date}`)
+  }
+
+  const handleCloseDialog = () => {
+    setIsDialogOpen(false)
+    // Limpa os parâmetros de criação e edição da URL para evitar reabertura acidental
+    router.push(`/dashboard/agenda?view=${view}&period=${period}&date=${date}`)
+    router.refresh()
   }
 
   return (
@@ -150,10 +167,7 @@ export function AgendaClient({
       {/* MODAL DIALOG PARA CRIAR NOVA AULA */}
       <LessonDialog
         isOpen={isDialogOpen}
-        onClose={() => {
-          setIsDialogOpen(false)
-          router.refresh()
-        }}
+        onClose={handleCloseDialog}
         students={students}
         subjects={subjects}
         editingLesson={null}

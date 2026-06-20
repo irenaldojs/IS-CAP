@@ -73,11 +73,17 @@ interface Student {
   parentName: string | null
   parentPhone: string | null
   email: string | null
+  phone: string | null
   school: string | null
   age: number | null
   gradeLevel: string | null
   notes: string | null
   active: boolean
+  fixedScheduleActive: boolean
+  fixedScheduleDay: string | null
+  fixedScheduleTime: string | null
+  fixedSchedulePrice: number | null
+  fixedScheduleTemporarilyDisabled: boolean
   subjects: SubjectRelation[]
   lessons: Lesson[]
   exams: Exam[]
@@ -192,6 +198,14 @@ export function StudentDetailClient({ student }: StudentDetailClientProps) {
                   </div>
                   <div className="space-y-1">
                     <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">
+                      Contato do Aluno
+                    </p>
+                    <p className="text-sm font-medium text-slate-200">
+                      {student.phone || <span className="text-slate-500 italic">Não informado</span>}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">
                       Idade
                     </p>
                     <p className="text-sm font-medium text-slate-200">
@@ -300,6 +314,57 @@ export function StudentDetailClient({ student }: StudentDetailClientProps) {
                   )}
                 </CardContent>
               </Card>
+
+              {/* Card Agenda Fixa */}
+              <Card className="border-slate-800 bg-slate-900/20 backdrop-blur-md">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base font-semibold text-slate-200 flex items-center gap-2">
+                    <Clock className="size-4.5 text-indigo-400" />
+                    Agenda Fixa (Semanal)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 pb-6">
+                  {student.fixedScheduleActive ? (
+                    <>
+                      <div className="flex items-center gap-2">
+                        {student.fixedScheduleTemporarilyDisabled ? (
+                          <span className="inline-flex items-center rounded-full bg-amber-950/40 px-2.5 py-0.5 text-xs font-semibold text-amber-400 border border-amber-900/20">
+                            Pausada Temporariamente
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center rounded-full bg-emerald-950/40 px-2.5 py-0.5 text-xs font-semibold text-emerald-400 border border-emerald-900/20">
+                            Ativa e Recorrente
+                          </span>
+                        )}
+                      </div>
+                      
+                      <div className="space-y-1 pt-1">
+                        <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Horário Reservado</p>
+                        <p className="text-sm font-medium text-slate-200">
+                          {student.fixedScheduleDay} às {student.fixedScheduleTime}
+                        </p>
+                      </div>
+
+                      <div className="space-y-1">
+                        <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Preço Fixo da Aula</p>
+                        <p className="text-sm font-mono font-medium text-indigo-300">
+                          {student.fixedSchedulePrice ? formatCurrency(student.fixedSchedulePrice) : 'R$ 0,00'}
+                        </p>
+                      </div>
+
+                      {student.fixedScheduleTemporarilyDisabled && (
+                        <p className="text-xs text-amber-450 italic mt-1 leading-normal">
+                          * Esta semana não haverá aula recorrente para este aluno.
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <div className="text-center py-3">
+                      <p className="text-sm text-slate-500 italic">Nenhum horário fixo configurado.</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </div>
           </div>
         )}
@@ -314,6 +379,30 @@ export function StudentDetailClient({ student }: StudentDetailClientProps) {
               </CardDescription>
             </CardHeader>
             <CardContent className="p-0">
+              {/* Resumo de Aulas e Financeiro do Aluno */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 border-b border-slate-800 bg-slate-950/15 p-4 gap-4">
+                <div className="bg-slate-900/30 p-3 rounded-lg border border-slate-800/40">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Total de Aulas</p>
+                  <p className="mt-1 text-2xl font-bold text-slate-200">
+                    {student.lessons.length}
+                  </p>
+                </div>
+                <div className="bg-slate-900/30 p-3 rounded-lg border border-slate-800/40">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Valor Total Acumulado</p>
+                  <p className="mt-1 text-2xl font-bold text-indigo-400 font-mono">
+                    {formatCurrency(student.lessons.reduce((sum, l) => sum + l.value, 0))}
+                  </p>
+                </div>
+                <div className="bg-slate-900/30 p-3 rounded-lg border border-slate-800/40">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Preço Fixo da Aula</p>
+                  <p className="mt-1 text-2xl font-bold text-emerald-400 font-mono">
+                    {student.fixedScheduleActive && student.fixedSchedulePrice
+                      ? formatCurrency(student.fixedSchedulePrice)
+                      : 'N/A'}
+                  </p>
+                </div>
+              </div>
+
               {student.lessons.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
                   <Calendar className="size-12 text-slate-700 mb-3" />

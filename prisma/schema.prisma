@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
 }
 
 // ─── Models ──────────────────────────────────────────────
@@ -26,6 +26,7 @@ model User {
   materials     Material[]
   packages      Package[]
   notifications Notification[]
+  recurringSchedules RecurringSchedule[]
 
   @@map("users")
 }
@@ -38,19 +39,28 @@ model Student {
   parentName  String?          @map("parent_name")
   parentPhone String?          @map("parent_phone")
   email       String?
+  phone       String?
   school      String?
   age         Int?
   gradeLevel  String?          @map("grade_level")
   notes       String?
-  active      Boolean          @default(true)
-  createdAt   DateTime         @default(now()) @map("created_at")
-  updatedAt   DateTime         @updatedAt @map("updated_at")
+  active                           Boolean          @default(true)
+  createdAt                        DateTime         @default(now()) @map("created_at")
+  updatedAt                        DateTime         @updatedAt @map("updated_at")
+
+  // Agenda Fixa (Aula Recorrente)
+  fixedScheduleActive              Boolean          @default(false) @map("fixed_schedule_active")
+  fixedScheduleDay                 String?          @map("fixed_schedule_day")
+  fixedScheduleTime                String?          @map("fixed_schedule_time")
+  fixedSchedulePrice               Float?           @map("fixed_schedule_price")
+  fixedScheduleTemporarilyDisabled Boolean          @default(false) @map("fixed_schedule_temp_disabled")
 
   subjects    StudentSubject[]
   lessons     Lesson[]
   exams       Exam[]
   grades      Grade[]
   packages    Package[]
+  recurringSchedules RecurringSchedule[]
 
   @@map("students")
 }
@@ -69,6 +79,7 @@ model Subject {
   exams     Exam[]
   grades    Grade[]
   packages  Package[]
+  recurringSchedules RecurringSchedule[]
 
   @@unique([userId, name])
   @@map("subjects")
@@ -85,33 +96,62 @@ model StudentSubject {
   @@map("student_subjects")
 }
 
+model RecurringSchedule {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  user          User     @relation(fields: [userId], references: [id])
+  studentId     String   @map("student_id")
+  student       Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subjectId     String   @map("subject_id")
+  subject       Subject  @relation(fields: [subjectId], references: [id])
+  
+  dayOfWeek     Int      // 0 = Domingo, 1 = Segunda, 2 = Terça, etc.
+  startTime     String   // Formato "HH:MM" (ex: "14:00")
+  durationHours Float    @map("duration_hours") @default(1.5)
+  value         Float    // Preço da aula recorrente
+  modality      String   // PRESENCIAL, ONLINE
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  lessons       Lesson[]
+
+  @@map("recurring_schedules")
+}
+
 model Lesson {
-  id                String    @id @default(uuid())
-  userId            String    @map("user_id")
-  user              User      @relation(fields: [userId], references: [id])
-  studentId         String    @map("student_id")
-  student           Student   @relation(fields: [studentId], references: [id])
-  subjectId         String    @map("subject_id")
-  subject           Subject   @relation(fields: [subjectId], references: [id])
-  packageId         String?   @map("package_id")
-  package           Package?  @relation(fields: [packageId], references: [id])
+  id                String             @id @default(uuid())
+  userId            String             @map("user_id")
+  user              User               @relation(fields: [userId], references: [id])
+  studentId         String             @map("student_id")
+  student           Student            @relation(fields: [studentId], references: [id])
+  subjectId         String             @map("subject_id")
+  subject           Subject            @relation(fields: [subjectId], references: [id])
+  packageId         String?            @map("package_id")
+  package           Package?           @relation(fields: [packageId], references: [id])
   date              DateTime
-  startTime         DateTime  @map("start_time")
-  durationHours     Float     @map("duration_hours")
+  startTime         DateTime           @map("start_time")
+  durationHours     Float              @map("duration_hours")
   value             Float
-  modality          String    // PRESENCIAL, ONLINE
-  status            String    @default("AGENDADA") // AGENDADA, CONCLUIDA, CANCELADA
-  recurrence        String?   // SEMANAL, QUINZENAL, MENSAL
-  recurrenceGroupId String?   @map("recurrence_group_id")
+  modality          String             // PRESENCIAL, ONLINE
+  status            String             @default("AGENDADA") // AGENDADA, CONCLUIDA, CANCELADA
+  recurrence        String?            // SEMANAL, QUINZENAL, MENSAL, AVULSA
+  recurrenceGroupId String?            @map("recurrence_group_id")
+  
+  // Vínculo opcional com a recorrência original (exceções semanais)
+  recurringScheduleId String?           @map("recurring_schedule_id")
+  recurringSchedule   RecurringSchedule? @relation(fields: [recurringScheduleId], references: [id], onDelete: SetNull)
+  
   notes             String?
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
 
   payment           Payment?
 
   @@index([date])
   @@index([status])
   @@index([recurrenceGroupId])
+  @@index([recurringScheduleId])
   @@map("lessons")
 }
 

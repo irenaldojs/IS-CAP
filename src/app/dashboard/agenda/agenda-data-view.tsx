@@ -9,6 +9,7 @@ import {
   Clock,
   ChevronLeft,
   ChevronRight,
+  Repeat,
 } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
@@ -205,35 +206,55 @@ export async function LessonsDataView({ view, period, date }: LessonsDataViewPro
     )
   }
 
-  // --- Lógica de Visualização em Calendário ---
+  // --- Lógica de Visualização em Calendário (Semanal) ---
   const selectedDate = new Date(date + 'T12:00:00') // evita problemas de timezone
 
-  const getDaysInMonth = (pivotDate: Date) => {
-    const year = pivotDate.getFullYear()
-    const month = pivotDate.getMonth()
-    const firstDay = new Date(year, month, 1)
-    const lastDay = new Date(year, month + 1, 0)
-    
-    const days = []
-    
-    const startDayOfWeek = firstDay.getDay()
-    for (let i = 0; i < startDayOfWeek; i++) {
-      days.push(null)
-    }
-
-    for (let i = 1; i <= lastDay.getDate(); i++) {
-      days.push(new Date(year, month, i))
-    }
-
-    return days
+  // Obtém a segunda-feira da semana da data selecionada
+  const getMonday = (d: Date) => {
+    const dateCopy = new Date(d)
+    const day = dateCopy.getDay()
+    const diff = dateCopy.getDate() - day + (day === 0 ? -6 : 1) // ajusta para segunda
+    return new Date(dateCopy.setDate(diff))
   }
 
-  const calendarDays = getDaysInMonth(selectedDate)
-  const monthName = selectedDate.toLocaleString('pt-BR', { month: 'long', year: 'numeric' })
+  const monday = getMonday(selectedDate)
+  const weekDays: Date[] = []
+  for (let i = 0; i < 7; i++) {
+    const day = new Date(monday)
+    day.setDate(monday.getDate() + i)
+    weekDays.push(day)
+  }
 
-  // Aulas do dia selecionado
-  const getLessonsForDate = (day: Date) => {
-    return lessons.filter((lesson) => {
+  // Aulas do período da semana
+  const startOfWeek = new Date(monday)
+  startOfWeek.setHours(0, 0, 0, 0)
+  const endOfWeekCalendar = new Date(monday)
+  endOfWeekCalendar.setDate(monday.getDate() + 6)
+  endOfWeekCalendar.setHours(23, 59, 59, 999)
+
+  const weekLessons = lessons.filter((lesson) => {
+    const lessonDate = new Date(lesson.date)
+    return lessonDate >= startOfWeek && lessonDate <= endOfWeekCalendar
+  })
+
+  // Formatador de datas da semana para o cabeçalho
+  const formatDateRange = () => {
+    const formatDay = (d: Date) => d.getDate()
+    const formatMonth = (d: Date) => d.toLocaleString('pt-BR', { month: 'short' })
+    const formatYear = (d: Date) => d.getFullYear()
+    
+    const sunday = weekDays[6]
+    
+    if (monday.getMonth() === sunday.getMonth()) {
+      return `${formatDay(monday)} a ${formatDay(sunday)} de ${formatMonth(monday)} de ${formatYear(monday)}`
+    } else if (monday.getFullYear() === sunday.getFullYear()) {
+      return `${formatDay(monday)} de ${formatMonth(monday)} a ${formatDay(sunday)} de ${formatMonth(sunday)} de ${formatYear(monday)}`
+    }
+    return `${formatDay(monday)} de ${formatMonth(monday)} de ${formatYear(monday)} a ${formatDay(sunday)} de ${formatMonth(sunday)} de ${formatYear(sunday)}`
+  }
+
+  const getLessonsForDay = (day: Date) => {
+    return weekLessons.filter((lesson) => {
       const d = new Date(lesson.date)
       return (
         d.getDate() === day.getDate() &&
@@ -243,172 +264,229 @@ export async function LessonsDataView({ view, period, date }: LessonsDataViewPro
     })
   }
 
-  const lessonsForSelectedDay = getLessonsForDate(selectedDate)
-
-  // Cálculo dos meses vizinhos para paginação
-  const getNeighborMonthDate = (pivotDate: Date, direction: number) => {
+  const getNeighborWeekDate = (pivotDate: Date, direction: number) => {
     const newDate = new Date(pivotDate)
-    newDate.setMonth(newDate.getMonth() + direction)
-    newDate.setDate(1)
+    newDate.setDate(newDate.getDate() + direction * 7)
     return newDate.toISOString().split('T')[0]
   }
 
-  const prevMonthDateStr = getNeighborMonthDate(selectedDate, -1)
-  const nextMonthDateStr = getNeighborMonthDate(selectedDate, 1)
+  const prevWeekDateStr = getNeighborWeekDate(selectedDate, -1)
+  const nextWeekDateStr = getNeighborWeekDate(selectedDate, 1)
+
+  // Estatísticas da semana
+  const totalDuration = weekLessons.reduce((acc, l) => acc + l.durationHours, 0)
+  const totalValue = weekLessons.reduce((acc, l) => acc + (l.status !== 'CANCELADA' ? l.value : 0), 0)
+
+  // Configurações do grid de horários
+  const startHour = 7
+  const endHour = 21
+  const hourHeight = 68 // pixels por hora
+  const hoursArray = Array.from({ length: endHour - startHour + 1 }, (_, i) => startHour + i)
+
+  const getPosition = (startTimeStr: Date | string, durationHours: number) => {
+    const startTime = new Date(startTimeStr)
+    const hours = startTime.getHours()
+    const minutes = startTime.getMinutes()
+    
+    const timeDiff = hours + minutes / 60 - startHour
+    const top = timeDiff * hourHeight
+    const height = durationHours * hourHeight
+    
+    return { top, height }
+  }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* Calendário Mensal */}
-      <Card className="lg:col-span-2 border-slate-800 bg-slate-900/20 backdrop-blur-md">
-        <CardHeader className="flex flex-row items-center justify-between pb-4">
-          <div>
-            <CardTitle className="text-lg font-semibold text-slate-200 capitalize">
-              {monthName}
-            </CardTitle>
-            <CardDescription className="text-slate-400">
-              Dias com aulas estão marcados com pontos coloridos.
-            </CardDescription>
-          </div>
-          <div className="flex items-center gap-1">
+    <div className="space-y-6">
+      {/* Informações da Semana Selecionada */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between bg-slate-900/30 p-4 rounded-xl border border-slate-800/80 backdrop-blur-md">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 border border-slate-800 bg-slate-950 p-1 rounded-lg">
             <Link
-              href={`/dashboard/agenda?view=calendar&date=${prevMonthDateStr}`}
+              href={`/dashboard/agenda?view=calendar&date=${prevWeekDateStr}`}
               className={cn(buttonVariants({ variant: 'outline', size: 'icon-sm' }), "h-8 w-8 cursor-pointer")}
+              title="Semana Anterior"
             >
               <ChevronLeft className="size-4" />
             </Link>
             <Link
-              href={`/dashboard/agenda?view=calendar&date=${nextMonthDateStr}`}
+              href={`/dashboard/agenda?view=calendar&date=${nextWeekDateStr}`}
               className={cn(buttonVariants({ variant: 'outline', size: 'icon-sm' }), "h-8 w-8 cursor-pointer")}
+              title="Próxima Semana"
             >
               <ChevronRight className="size-4" />
             </Link>
           </div>
-        </CardHeader>
-        <CardContent className="p-4">
-          {/* Dias da semana */}
-          <div className="grid grid-cols-7 text-center font-bold text-xs text-slate-500 pb-2 border-b border-slate-800/40">
-            <div>DOM</div>
-            <div>SEG</div>
-            <div>TER</div>
-            <div>QUA</div>
-            <div>QUI</div>
-            <div>SEX</div>
-            <div>SÁB</div>
+          <div>
+            <h2 className="text-md font-bold text-slate-200 capitalize">
+              {formatDateRange()}
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Grade de horários semanais e agendamentos fixos/avulsos.
+            </p>
           </div>
+        </div>
 
-          {/* Grid de dias do mês */}
-          <div className="grid grid-cols-7 gap-1.5 pt-2">
-            {calendarDays.map((day, idx) => {
-              if (!day) return <div key={`empty-${idx}`} className="aspect-square bg-slate-900/5 rounded-lg opacity-20" />
-
-              const dayLessons = getLessonsForDate(day)
-              const hasLessons = dayLessons.length > 0
-              const isToday = new Date().toDateString() === day.toDateString()
-              const isSelected = selectedDate.toDateString() === day.toDateString()
-              const dayStr = day.toISOString().split('T')[0]
-
-              return (
-                <Link
-                  key={day.toISOString()}
-                  href={`/dashboard/agenda?view=calendar&date=${dayStr}`}
-                  className={`aspect-square relative flex flex-col items-center justify-center rounded-lg border transition-all cursor-pointer ${
-                    isSelected
-                      ? 'bg-indigo-600/40 border-indigo-500 text-white font-bold'
-                      : isToday
-                      ? 'bg-slate-800/60 border-slate-700 text-indigo-400 font-semibold'
-                      : 'bg-slate-950/20 border-slate-900 text-slate-300 hover:bg-slate-800/25 hover:border-slate-800'
-                  }`}
-                >
-                  <span className="text-sm">{day.getDate()}</span>
-                  
-                  {/* Dots indicando aulas */}
-                  {hasLessons && (
-                    <div className="absolute bottom-1.5 flex gap-1 justify-center">
-                      {dayLessons.slice(0, 3).map((lesson) => (
-                        <span
-                          key={lesson.id}
-                          style={{ backgroundColor: lesson.subject.color }}
-                          className="size-1 rounded-full shadow-sm shadow-black"
-                          title={`${lesson.student.name}: ${lesson.subject.name}`}
-                        />
-                      ))}
-                      {dayLessons.length > 3 && (
-                        <span className="text-[7px] text-slate-400 font-bold -mt-1">+</span>
-                      )}
-                    </div>
-                  )}
-                </Link>
-              )
-            })}
+        {/* Resumo Rápido da Semana */}
+        <div className="flex flex-wrap gap-4 text-xs">
+          <div className="bg-slate-950/40 px-3 py-2 rounded-lg border border-slate-850">
+            <span className="text-slate-500 block">Aulas Semanais</span>
+            <span className="text-sm font-bold text-white mt-0.5 block">{weekLessons.length} Aulas</span>
           </div>
-        </CardContent>
-      </Card>
+          <div className="bg-slate-950/40 px-3 py-2 rounded-lg border border-slate-850">
+            <span className="text-slate-500 block">Horas Totais</span>
+            <span className="text-sm font-bold text-indigo-400 mt-0.5 block">{totalDuration} Horas</span>
+          </div>
+          <div className="bg-slate-950/40 px-3 py-2 rounded-lg border border-slate-850">
+            <span className="text-slate-500 block">Receita Estimada</span>
+            <span className="text-sm font-bold text-emerald-400 mt-0.5 block font-mono">{formatCurrency(totalValue)}</span>
+          </div>
+        </div>
+      </div>
 
-      {/* Lateral: Aulas do Dia Selecionado */}
-      <Card className="border-slate-800 bg-slate-900/20 backdrop-blur-md">
-        <CardHeader className="border-b border-slate-800/40 pb-4">
-          <CardTitle className="text-base font-bold text-slate-200">
-            Aulas de {selectedDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
-          </CardTitle>
-          <CardDescription className="text-slate-400">
-            Agenda detalhada para a data selecionada.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-4 space-y-4 max-h-[55vh] overflow-y-auto">
-          {lessonsForSelectedDay.length === 0 ? (
-            <div className="text-center py-12 text-slate-500 text-sm italic">
-              Nenhuma aula agendada para este dia.
+      {/* Calendário Semanal Grid */}
+      <div className="relative flex border border-slate-800 bg-slate-900/10 rounded-xl overflow-x-auto scrollbar-thin scrollbar-thumb-slate-800/80">
+        
+        {/* Coluna de Horas */}
+        <div className="w-14 flex-shrink-0 border-r border-slate-800 bg-slate-950/60 text-right pr-2 text-[10px] font-semibold text-slate-550 select-none">
+          {/* Cabeçalho Vazio para alinhar */}
+          <div className="h-12 border-b border-slate-800" />
+          {/* Linhas de Horas */}
+          {hoursArray.map((hour) => (
+            <div key={hour} className="h-[68px] flex items-start justify-end pt-1">
+              {String(hour).padStart(2, '0')}:00
             </div>
-          ) : (
-            lessonsForSelectedDay.map((lesson) => (
-              <Link
-                key={lesson.id}
-                href={`/dashboard/agenda?view=calendar&date=${date}&editLessonId=${lesson.id}`}
-                className="flex flex-col gap-2.5 p-3 rounded-lg border border-slate-800 hover:border-slate-700 bg-slate-950/35 hover:bg-slate-950/60 transition-all cursor-pointer group"
-              >
-                <div className="flex items-center justify-between">
-                  <span
-                    style={{ color: lesson.subject.color, backgroundColor: `${lesson.subject.color}12` }}
-                    className="px-2 py-0.5 text-xs font-semibold rounded border border-slate-800"
-                  >
-                    {lesson.subject.name}
-                  </span>
-                  <span className="text-xs font-mono text-slate-400 flex items-center gap-1">
-                    <Clock className="size-3 text-slate-500" />
-                    {formatTime(lesson.startTime)} ({lesson.durationHours}h)
-                  </span>
-                </div>
+          ))}
+        </div>
 
-                <div className="font-semibold text-slate-200 group-hover:text-white transition-colors">
-                  {lesson.student.name}
-                </div>
-
-                {lesson.notes && (
-                  <p className="text-xs text-slate-400 line-clamp-2 italic bg-slate-950/50 p-2 rounded">
-                    {lesson.notes}
-                  </p>
-                )}
-
-                <div className="flex items-center justify-between pt-1 border-t border-slate-900 text-xs">
-                  {lesson.modality === 'ONLINE' ? (
-                    <span className="text-sky-400 flex items-center gap-1">
-                      <Video className="size-3" /> Online
-                    </span>
-                  ) : (
-                    <span className="text-amber-400 flex items-center gap-1">
-                      <MapPin className="size-3" /> Presencial
-                    </span>
+        {/* Grid de Dias */}
+        <div className="flex-grow grid grid-cols-7 min-w-[980px]">
+          {weekDays.map((day, idx) => {
+            const dayLessons = getLessonsForDay(day)
+            const isToday = new Date().toDateString() === day.toDateString()
+            const dayStr = day.toISOString().split('T')[0]
+            
+            return (
+              <div key={idx} className="border-r border-slate-800/60 last:border-r-0 relative">
+                {/* Cabeçalho do Dia */}
+                <div
+                  className={cn(
+                    "h-12 flex flex-col items-center justify-center border-b border-slate-800 transition-colors bg-slate-950/20",
+                    isToday && "bg-indigo-950/20 text-indigo-400 border-b-2 border-b-indigo-500 font-bold"
                   )}
-                  
-                  <span className="font-bold text-slate-300">
-                    {formatCurrency(lesson.value)}
+                >
+                  <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+                    {day.toLocaleDateString('pt-BR', { weekday: 'short' })}
+                  </span>
+                  <span className={cn(
+                    "text-sm font-extrabold mt-0.5",
+                    isToday ? "text-indigo-400" : "text-slate-200"
+                  )}>
+                    {day.getDate()}
                   </span>
                 </div>
-              </Link>
-            ))
-          )}
-        </CardContent>
-      </Card>
+
+                {/* Área de Slots / Grid */}
+                <div className="relative" style={{ height: `${hoursArray.length * hourHeight}px` }}>
+                  
+                  {/* Linhas Horizontais de Fundo e Click para Criar */}
+                  {hoursArray.map((hour) => {
+                    const timeStr = `${String(hour).padStart(2, '0')}:00`
+                    return (
+                      <Link
+                        key={hour}
+                        href={`/dashboard/agenda?view=calendar&date=${date}&createDate=${dayStr}&createTime=${timeStr}`}
+                        style={{ top: `${(hour - startHour) * hourHeight}px` }}
+                        className="absolute left-0 right-0 h-[68px] border-b border-slate-900/35 hover:bg-indigo-550/5 transition-colors cursor-pointer z-0"
+                        title={`Agendar aula para ${timeStr}`}
+                      />
+                    )
+                  })}
+
+                  {/* Cards de Aulas */}
+                  {dayLessons.map((lesson) => {
+                    const { top, height } = getPosition(lesson.startTime, lesson.durationHours)
+                    return (
+                      <div
+                        key={lesson.id}
+                        style={{
+                          top: `${top}px`,
+                          height: `${height}px`,
+                          backgroundColor: `${lesson.subject.color}15`,
+                          borderColor: lesson.subject.color,
+                        }}
+                        className="absolute left-1 right-1 p-2 rounded-lg border-l-4 border-y border-r border-slate-800/85 flex flex-col justify-between transition-all hover:scale-[1.01] hover:shadow-lg hover:shadow-indigo-950/20 hover:z-20 group z-10 select-none overflow-hidden"
+                      >
+                        {/* Status / Matéria e Ações Rápidas */}
+                        <div className="flex items-start justify-between gap-1">
+                          <span
+                            style={{ color: lesson.subject.color }}
+                            className="text-[9px] font-extrabold tracking-wide uppercase truncate"
+                          >
+                            {lesson.subject.name}
+                          </span>
+                          <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 items-center shrink-0 z-20">
+                            <LessonStatusButton id={lesson.id} status={lesson.status} />
+                          </div>
+                        </div>
+
+                        {/* Aluno e Horário */}
+                        <Link
+                          href={`/dashboard/agenda?view=calendar&date=${date}&editLessonId=${lesson.id}`}
+                          className="flex-grow flex flex-col justify-center min-w-0 py-1"
+                        >
+                          <span className={cn(
+                            "text-xs font-bold text-slate-100 truncate block group-hover:text-white transition-colors",
+                            lesson.status === 'CANCELADA' && 'line-through text-slate-500 font-medium'
+                          )}>
+                            {lesson.student.name}
+                          </span>
+                          <span className="text-[9px] text-slate-400 font-mono mt-0.5 flex items-center gap-0.5">
+                            <Clock className="size-2.5 text-slate-500" />
+                            {formatTime(lesson.startTime)} ({lesson.durationHours}h)
+                          </span>
+                        </Link>
+
+                        {/* Rodapé: Modalidade e Recorrência */}
+                        <div className="flex items-center justify-between text-[9px] pt-1.5 border-t border-slate-800/40 text-slate-400">
+                          {lesson.modality === 'ONLINE' ? (
+                            <span className="text-sky-400 font-semibold flex items-center gap-0.5">
+                              <Video className="size-2.5" />
+                              Online
+                            </span>
+                          ) : (
+                            <span className="text-amber-400 font-semibold flex items-center gap-0.5">
+                              <MapPin className="size-2.5" />
+                              Presencial
+                            </span>
+                          )}
+                          
+                          <div className="flex items-center gap-1">
+                            {lesson.status === 'CONCLUIDA' ? (
+                              <span className="text-[8px] bg-emerald-950/50 text-emerald-450 border border-emerald-900/30 rounded px-1 font-bold">
+                                Concl.
+                              </span>
+                            ) : lesson.status === 'CANCELADA' ? (
+                              <span className="text-[8px] bg-red-950/50 text-red-450 border border-red-900/30 rounded px-1 font-bold">
+                                Cancel.
+                              </span>
+                            ) : null}
+
+                            {lesson.recurringScheduleId && (
+                              <span className="flex items-center" title="Aula Semanal Fixa">
+                                <Repeat className="size-3 text-indigo-400 animate-pulse" />
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
     </div>
   )
 }

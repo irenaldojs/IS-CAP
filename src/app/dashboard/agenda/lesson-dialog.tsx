@@ -4,12 +4,19 @@ import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { createLesson, updateLesson, deleteLesson } from '@/actions/lessons'
+import { 
+  createLesson, 
+  updateLesson, 
+  deleteLesson,
+  createRecurringSchedule,
+  updateRecurringSchedule,
+  deleteRecurringSchedule
+} from '@/actions/lessons'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
-import { X, Loader2, Calendar, Clock, DollarSign, BookOpen, User, Video, MapPin, Trash2 } from 'lucide-react'
+import { X, Loader2, Calendar, Clock, DollarSign, BookOpen, User, Video, MapPin, Trash2, Repeat } from 'lucide-react'
 
 // Zod Form Validation
 const lessonFormSchema = z.object({
@@ -50,6 +57,7 @@ interface Lesson {
   studentId: string
   subjectId: string
   recurrence: string | null
+  recurringScheduleId?: string | null
 }
 
 interface LessonDialogProps {
@@ -69,6 +77,8 @@ export function LessonDialog({
 }: LessonDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [scheduleType, setScheduleType] = useState<'AVULSA' | 'SEMANAL'>('AVULSA')
+  const [editOption, setEditOption] = useState<'INSTANCE' | 'SERIES'>('INSTANCE')
 
   const {
     register,
@@ -100,6 +110,9 @@ export function LessonDialog({
       
       const startTime = new Date(editingLesson.startTime)
       const timeString = startTime.toTimeString().split(' ')[0].substring(0, 5) // HH:MM
+      
+      setScheduleType(editingLesson.recurringScheduleId ? 'SEMANAL' : 'AVULSA')
+      setEditOption('INSTANCE')
 
       reset({
         studentId: editingLesson.studentId,
@@ -114,6 +127,8 @@ export function LessonDialog({
         notes: editingLesson.notes || '',
       })
     } else {
+      setScheduleType('AVULSA')
+      setEditOption('INSTANCE')
       reset({
         studentId: '',
         subjectId: '',
@@ -135,25 +150,67 @@ export function LessonDialog({
       // Concatena data e hora em objetos DateTime correspondentes
       const combinedDateTime = new Date(`${values.date}T${values.time}:00`)
 
-      const lessonInput = {
-        studentId: values.studentId,
-        subjectId: values.subjectId,
-        date: combinedDateTime,
-        startTime: combinedDateTime,
-        durationHours: values.durationHours,
-        value: values.value,
-        modality: values.modality,
-        status: values.status,
-        recurrence: values.recurrence || null,
-        notes: values.notes || null,
-      }
-
       if (editingLesson) {
-        await updateLesson(editingLesson.id, lessonInput)
-        toast.success('Aula atualizada com sucesso!')
+        if (editingLesson.recurringScheduleId && editOption === 'SERIES') {
+          // Atualiza a recorrência inteira
+          const firstDate = new Date(combinedDateTime)
+          const dayOfWeek = firstDate.getDay()
+          const timeString = firstDate.toTimeString().split(' ')[0].substring(0, 5) // HH:MM
+
+          await updateRecurringSchedule(editingLesson.recurringScheduleId, {
+            dayOfWeek,
+            startTime: timeString,
+            durationHours: values.durationHours,
+            value: values.value,
+            modality: values.modality,
+          })
+          toast.success('Série de aulas recorrentes atualizada com sucesso!')
+        } else {
+          // Atualiza apenas a instância selecionada
+          const lessonInput = {
+            studentId: values.studentId,
+            subjectId: values.subjectId,
+            date: combinedDateTime,
+            startTime: combinedDateTime,
+            durationHours: values.durationHours,
+            value: values.value,
+            modality: values.modality,
+            status: values.status,
+            recurrence: editingLesson.recurringScheduleId ? 'SEMANAL' : 'AVULSA',
+            notes: values.notes || null,
+          }
+          await updateLesson(editingLesson.id, lessonInput)
+          toast.success('Esta aula foi atualizada com sucesso!')
+        }
       } else {
-        await createLesson(lessonInput)
-        toast.success('Aula agendada com sucesso!')
+        // Novo Agendamento
+        if (scheduleType === 'SEMANAL') {
+          await createRecurringSchedule({
+            studentId: values.studentId,
+            subjectId: values.subjectId,
+            startDate: combinedDateTime,
+            durationHours: values.durationHours,
+            value: values.value,
+            modality: values.modality,
+            notes: values.notes,
+          })
+          toast.success('Agendamento semanal e aulas das próximas 8 semanas gerados!')
+        } else {
+          const lessonInput = {
+            studentId: values.studentId,
+            subjectId: values.subjectId,
+            date: combinedDateTime,
+            startTime: combinedDateTime,
+            durationHours: values.durationHours,
+            value: values.value,
+            modality: values.modality,
+            status: values.status,
+            recurrence: 'AVULSA',
+            notes: values.notes || null,
+          }
+          await createLesson(lessonInput)
+          toast.success('Aula avulsa agendada com sucesso!')
+        }
       }
       onClose()
     } catch (error) {
@@ -166,16 +223,26 @@ export function LessonDialog({
 
   const handleDelete = async () => {
     if (!editingLesson) return
-    if (!confirm('Deseja realmente excluir esta aula? Esta ação não pode ser desfeita.')) return
+    
+    const confirmMsg = editingLesson.recurringScheduleId && editOption === 'SERIES'
+      ? 'Deseja realmente excluir toda a série recorrente de aulas? Isto apagará todas as aulas futuras agendadas desta série.'
+      : 'Deseja realmente excluir esta aula? Esta ação não pode ser desfeita.'
+
+    if (!confirm(confirmMsg)) return
 
     setIsDeleting(true)
     try {
-      await deleteLesson(editingLesson.id)
-      toast.success('Aula excluída com sucesso!')
+      if (editingLesson.recurringScheduleId && editOption === 'SERIES') {
+        await deleteRecurringSchedule(editingLesson.recurringScheduleId)
+        toast.success('Série de aulas recorrentes excluída!')
+      } else {
+        await deleteLesson(editingLesson.id)
+        toast.success('Aula excluída com sucesso!')
+      }
       onClose()
     } catch (error) {
       console.error(error)
-      toast.error('Erro ao excluir a aula.')
+      toast.error('Erro ao excluir.')
     } finally {
       setIsDeleting(false)
     }
@@ -200,6 +267,7 @@ export function LessonDialog({
             {editingLesson ? 'Editar Aula Agendada' : 'Agendar Nova Aula'}
           </h2>
           <button 
+            type="button"
             onClick={onClose} 
             className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer"
           >
@@ -209,8 +277,76 @@ export function LessonDialog({
 
         {/* Form */}
         <form onSubmit={handleSubmit(onSubmit)}>
-          <div className="max-h-[75vh] overflow-y-auto p-6 space-y-4">
+          <div className="max-h-[72vh] overflow-y-auto p-6 space-y-4">
             
+            {/* Seletor Tipo de Agendamento (Apenas na Criação) */}
+            {!editingLesson && (
+              <div className="space-y-1.5">
+                <Label className="text-slate-400 text-xs font-semibold">Tipo de Agendamento</Label>
+                <div className="grid grid-cols-2 gap-2 bg-slate-950 p-1 rounded-lg border border-slate-850">
+                  <button
+                    type="button"
+                    onClick={() => setScheduleType('AVULSA')}
+                    className={`py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                      scheduleType === 'AVULSA'
+                        ? 'bg-indigo-650 text-white shadow-md'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Aula Avulsa
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setScheduleType('SEMANAL')}
+                    className={`py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                      scheduleType === 'SEMANAL'
+                        ? 'bg-indigo-650 text-white shadow-md'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Aula Semanal (Recorrente)
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Aviso e Opção de Edição de Recorrência */}
+            {editingLesson && editingLesson.recurringScheduleId && (
+              <div className="bg-slate-950/50 border border-slate-800/80 p-3 rounded-lg space-y-2">
+                <div className="flex items-center gap-2 text-indigo-400">
+                  <Repeat className="size-4 animate-pulse" />
+                  <span className="text-xs font-bold uppercase tracking-wider">Ajuste de Aula Recorrente</span>
+                </div>
+                <p className="text-slate-400 text-xs leading-relaxed">
+                  Esta aula faz parte de um agendamento semanal fixo. Como deseja salvar as alterações?
+                </p>
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setEditOption('INSTANCE')}
+                    className={`px-3 py-2 text-xs font-semibold rounded-md border transition-all cursor-pointer ${
+                      editOption === 'INSTANCE'
+                        ? 'bg-indigo-600/10 border-indigo-500 text-indigo-300'
+                        : 'bg-slate-950/40 border-slate-900 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Apenas esta semana
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditOption('SERIES')}
+                    className={`px-3 py-2 text-xs font-semibold rounded-md border transition-all cursor-pointer ${
+                      editOption === 'SERIES'
+                        ? 'bg-indigo-600/10 border-indigo-500 text-indigo-300'
+                        : 'bg-slate-950/40 border-slate-900 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Toda a recorrência
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Student Select */}
             <div className="space-y-1">
               <Label htmlFor="studentId" className="text-slate-300 text-xs font-semibold flex items-center gap-1.5">
@@ -218,7 +354,8 @@ export function LessonDialog({
               </Label>
               <select
                 id="studentId"
-                className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                disabled={!!editingLesson}
+                className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all disabled:opacity-50"
                 {...register('studentId')}
               >
                 <option value="">Selecione o aluno...</option>
@@ -240,7 +377,8 @@ export function LessonDialog({
               </Label>
               <select
                 id="subjectId"
-                className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                disabled={!!(editingLesson?.recurringScheduleId && editOption === 'SERIES')}
+                className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all disabled:opacity-50"
                 {...register('subjectId')}
               >
                 <option value="">Selecione a matéria...</option>
@@ -259,12 +397,13 @@ export function LessonDialog({
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
                 <Label htmlFor="date" className="text-slate-300 text-xs font-semibold flex items-center gap-1.5">
-                  <Calendar className="size-3.5 text-indigo-400" /> Data <span className="text-red-500">*</span>
+                  <Calendar className="size-3.5 text-indigo-400" /> {scheduleType === 'SEMANAL' && !editingLesson ? 'Data de Início' : 'Data'} <span className="text-red-500">*</span>
                 </Label>
                 <Input
                   id="date"
                   type="date"
-                  className="bg-slate-950 border-slate-800 text-slate-200 focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20"
+                  disabled={!!(editingLesson?.recurringScheduleId && editOption === 'SERIES')}
+                  className="bg-slate-950 border-slate-800 text-slate-200 focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20 disabled:opacity-50"
                   {...register('date')}
                 />
                 {errors.date && (
@@ -291,7 +430,7 @@ export function LessonDialog({
             {/* Duration & Value Grid */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <Label htmlFor="durationHours" className="text-slate-355 text-xs font-semibold flex items-center gap-1.5">
+                <Label htmlFor="durationHours" className="text-slate-300 text-xs font-semibold flex items-center gap-1.5">
                   <Clock className="size-3.5 text-indigo-400" /> Duração (horas) <span className="text-red-500">*</span>
                 </Label>
                 <Input
@@ -307,7 +446,7 @@ export function LessonDialog({
               </div>
 
               <div className="space-y-1">
-                <Label htmlFor="value" className="text-slate-355 text-xs font-semibold flex items-center gap-1.5">
+                <Label htmlFor="value" className="text-slate-300 text-xs font-semibold flex items-center gap-1.5">
                   <DollarSign className="size-3.5 text-indigo-400" /> Valor (R$) <span className="text-red-500">*</span>
                 </Label>
                 <Input
@@ -323,10 +462,10 @@ export function LessonDialog({
               </div>
             </div>
 
-            {/* Modality & Recurrence Grid */}
+            {/* Modality & Status Grid */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <Label htmlFor="modality" className="text-slate-355 text-xs font-semibold">
+                <Label htmlFor="modality" className="text-slate-300 text-xs font-semibold">
                   Modalidade <span className="text-red-500">*</span>
                 </Label>
                 <select
@@ -343,12 +482,13 @@ export function LessonDialog({
               </div>
 
               <div className="space-y-1">
-                <Label htmlFor="status" className="text-slate-355 text-xs font-semibold">
+                <Label htmlFor="status" className="text-slate-300 text-xs font-semibold">
                   Status da Aula
                 </Label>
                 <select
                   id="status"
-                  className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                  disabled={!!(editingLesson?.recurringScheduleId && editOption === 'SERIES')}
+                  className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all disabled:opacity-50"
                   {...register('status')}
                 >
                   <option value="AGENDADA">Agendada</option>
@@ -360,7 +500,7 @@ export function LessonDialog({
 
             {/* Notes / Obs */}
             <div className="space-y-1">
-              <Label htmlFor="notes" className="text-slate-355 text-xs font-semibold">
+              <Label htmlFor="notes" className="text-slate-300 text-xs font-semibold">
                 Observações / Conteúdo Previsto
               </Label>
               <textarea
@@ -389,7 +529,7 @@ export function LessonDialog({
                   ) : (
                     <Trash2 className="size-4 mr-2" />
                   )}
-                  Excluir
+                  {editingLesson.recurringScheduleId && editOption === 'SERIES' ? 'Excluir Série' : 'Excluir Aula'}
                 </Button>
               )}
             </div>
