@@ -1,16 +1,21 @@
-import { PrismaClient } from '@prisma/client'
-import { PrismaLibSql } from '@prisma/adapter-libsql'
+import prisma from '../src/lib/prisma'
 import bcrypt from 'bcryptjs'
-
-const adapter = new PrismaLibSql({
-  url: 'file:./dev.db',
-})
-const prisma = new PrismaClient({ adapter })
 
 async function main() {
   console.log('Iniciando seed do banco de dados...')
 
-  // Limpar dados anteriores
+  // Limpar dados anteriores em ordem para evitar erros de chaves estrangeiras
+  await prisma.grade.deleteMany()
+  await prisma.exam.deleteMany()
+  await prisma.payment.deleteMany()
+  await prisma.lesson.deleteMany()
+  await prisma.package.deleteMany()
+  await prisma.recurringSchedule.deleteMany()
+  await prisma.studentSubject.deleteMany()
+  await prisma.student.deleteMany()
+  await prisma.material.deleteMany()
+  await prisma.notification.deleteMany()
+  await prisma.expense.deleteMany()
   await prisma.subject.deleteMany()
   await prisma.user.deleteMany()
 
