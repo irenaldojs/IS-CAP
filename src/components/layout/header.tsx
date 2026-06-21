@@ -51,30 +51,38 @@ export default function Header() {
               <Loader2 className="size-4 animate-spin text-muted-foreground" />
             </div>
           ) : (
-            <button 
-              onClick={() => setIsProfileOpen(true)}
-              className="flex items-center gap-3 hover:opacity-85 transition-opacity cursor-pointer group text-left bg-transparent border-0 p-0 outline-none"
-              title="Ver / Editar perfil"
-            >
-              {/* Avatar do Usuário */}
-              <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-semibold shadow-xs group-hover:scale-105 transition-transform">
-                {session?.user?.name ? (
-                  getInitials(session.user.name)
-                ) : (
-                  <User className="size-4" />
-                )}
-              </div>
+            <div className="relative">
+              <button 
+                onClick={() => setIsProfileOpen(true)}
+                className="flex items-center gap-3 hover:opacity-85 transition-opacity cursor-pointer group text-left bg-transparent border-0 p-0 outline-none"
+                title="Ver perfil"
+              >
+                {/* Avatar do Usuário */}
+                <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-semibold shadow-xs group-hover:scale-105 transition-transform">
+                  {session?.user?.name ? (
+                    getInitials(session.user.name)
+                  ) : (
+                    <User className="size-4" />
+                  )}
+                </div>
 
-              {/* Informações de Texto */}
-              <div className="hidden flex-col md:flex">
-                <span className="text-xs font-semibold text-foreground leading-tight group-hover:text-indigo-400 transition-colors">
-                  {professorName}
-                </span>
-                <span className="text-[10px] text-muted-foreground leading-none">
-                  {professorEmail}
-                </span>
-              </div>
-            </button>
+                {/* Informações de Texto */}
+                <div className="hidden flex-col md:flex">
+                  <span className="text-xs font-semibold text-foreground leading-tight group-hover:text-indigo-400 transition-colors">
+                    {professorName}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground leading-none">
+                    {professorEmail}
+                  </span>
+                </div>
+              </button>
+
+              {/* Dialog do Perfil */}
+              <UserProfileDialog 
+                isOpen={isProfileOpen} 
+                onClose={() => setIsProfileOpen(false)} 
+              />
+            </div>
           )}
 
           {/* Botão de Logout */}
@@ -90,12 +98,6 @@ export default function Header() {
           </Button>
         </div>
       </div>
-
-      {/* Dialog do Perfil */}
-      <UserProfileDialog 
-        isOpen={isProfileOpen} 
-        onClose={() => setIsProfileOpen(false)} 
-      />
     </header>
   )
 }
