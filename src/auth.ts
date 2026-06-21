@@ -55,6 +55,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async session({ session, token }) {
       if (session.user && token.id) {
         session.user.id = token.id as string
+        
+        try {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: token.id as string },
+            select: { name: true, email: true },
+          })
+          if (dbUser) {
+            session.user.name = dbUser.name
+            session.user.email = dbUser.email
+          }
+        } catch (error) {
+          console.error("Erro ao buscar dados do usuário na sessão:", error)
+        }
       }
       return session
     },
