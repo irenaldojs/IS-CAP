@@ -47,12 +47,27 @@ export async function LessonsDataView({ view, period, date }: LessonsDataViewPro
     }).format(new Date(dateInput))
   }
 
-  // --- Lógica de Filtros ---
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
+  // --- Lógica de Filtros e Datas ---
+  const selectedDate = new Date(date + 'T12:00:00') // evita problemas de timezone
+  const targetDate = new Date(selectedDate)
+  targetDate.setHours(0, 0, 0, 0)
 
-  const endOfWeek = new Date(today)
-  endOfWeek.setDate(today.getDate() + (7 - today.getDay()))
+  // Obtém a segunda-feira da semana da data selecionada
+  const getMonday = (d: Date) => {
+    const dateCopy = new Date(d)
+    const day = dateCopy.getDay()
+    const diff = dateCopy.getDate() - day + (day === 0 ? -6 : 1) // ajusta para segunda
+    return new Date(dateCopy.setDate(diff))
+  }
+
+  const monday = getMonday(targetDate)
+
+  // Início e fim da semana da data selecionada
+  const startOfWeek = new Date(monday)
+  startOfWeek.setHours(0, 0, 0, 0)
+
+  const endOfWeek = new Date(monday)
+  endOfWeek.setDate(monday.getDate() + 6)
   endOfWeek.setHours(23, 59, 59, 999)
 
   const filteredLessons = lessons.filter((lesson) => {
@@ -60,17 +75,17 @@ export async function LessonsDataView({ view, period, date }: LessonsDataViewPro
     lessonDate.setHours(0, 0, 0, 0)
 
     if (period === 'today') {
-      return lessonDate.getTime() === today.getTime()
+      return lessonDate.getTime() === targetDate.getTime()
     }
     if (period === 'week') {
-      return lessonDate >= today && lessonDate <= endOfWeek
+      return lessonDate >= startOfWeek && lessonDate <= endOfWeek
     }
     if (period === 'upcoming') {
-      const startOfUpcoming = new Date(today)
+      const startOfUpcoming = new Date(targetDate)
       startOfUpcoming.setHours(0, 0, 0, 0)
       
-      const endOfUpcoming = new Date(today)
-      endOfUpcoming.setDate(today.getDate() + 7)
+      const endOfUpcoming = new Date(targetDate)
+      endOfUpcoming.setDate(targetDate.getDate() + 7)
       endOfUpcoming.setHours(23, 59, 59, 999)
       
       return lessonDate >= startOfUpcoming && lessonDate <= endOfUpcoming
@@ -222,17 +237,6 @@ export async function LessonsDataView({ view, period, date }: LessonsDataViewPro
   }
 
   // --- Lógica de Visualização em Calendário (Semanal) ---
-  const selectedDate = new Date(date + 'T12:00:00') // evita problemas de timezone
-
-  // Obtém a segunda-feira da semana da data selecionada
-  const getMonday = (d: Date) => {
-    const dateCopy = new Date(d)
-    const day = dateCopy.getDay()
-    const diff = dateCopy.getDate() - day + (day === 0 ? -6 : 1) // ajusta para segunda
-    return new Date(dateCopy.setDate(diff))
-  }
-
-  const monday = getMonday(selectedDate)
   const weekDays: Date[] = []
   for (let i = 0; i < 7; i++) {
     const day = new Date(monday)
@@ -241,15 +245,9 @@ export async function LessonsDataView({ view, period, date }: LessonsDataViewPro
   }
 
   // Aulas do período da semana
-  const startOfWeek = new Date(monday)
-  startOfWeek.setHours(0, 0, 0, 0)
-  const endOfWeekCalendar = new Date(monday)
-  endOfWeekCalendar.setDate(monday.getDate() + 6)
-  endOfWeekCalendar.setHours(23, 59, 59, 999)
-
   const weekLessons = lessons.filter((lesson) => {
     const lessonDate = new Date(lesson.date)
-    return lessonDate >= startOfWeek && lessonDate <= endOfWeekCalendar
+    return lessonDate >= startOfWeek && lessonDate <= endOfWeek
   })
 
   // Formatador de datas da semana para o cabeçalho

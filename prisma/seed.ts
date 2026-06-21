@@ -15,11 +15,11 @@ async function main() {
   await prisma.user.deleteMany()
 
   // Criar professor
-  const passwordHash = await bcrypt.hash('senha123', 10)
+  const passwordHash = await bcrypt.hash('24160704', 10)
   const teacher = await prisma.user.create({
     data: {
-      name: 'Professor João',
-      email: 'professor@iscap.com',
+      name: 'Marcelle Lemos',
+      email: 'marcellelemos.mrl@gmail.com',
       passwordHash,
     },
   })

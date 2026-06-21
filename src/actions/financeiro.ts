@@ -3,6 +3,7 @@
 import prisma from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { auth } from '@/auth'
+import { createNotification } from './notifications'
 
 export interface ExpenseInput {
   description: string
@@ -107,6 +108,33 @@ export async function togglePaymentStatus(
       paymentMethod: isPaid ? paymentMethod || 'PIX' : null,
     },
   })
+
+  if (isPaid) {
+    try {
+      const paymentWithLesson = await prisma.payment.findUnique({
+        where: { id },
+        include: {
+          lesson: {
+            include: {
+              student: { select: { name: true } }
+            }
+          }
+        }
+      })
+      
+      const studentName = paymentWithLesson?.lesson?.student?.name || 'Aluno'
+      const amountFormatted = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(payment.amount)
+      
+      await createNotification(
+        session.user.id,
+        'finance',
+        'Pagamento recebido',
+        `O pagamento de ${amountFormatted} do(a) aluno(a) ${studentName} foi confirmado.`
+      )
+    } catch (err) {
+      console.error('Erro ao gerar notificação de pagamento:', err)
+    }
+  }
 
   revalidatePath('/dashboard/financeiro')
   revalidatePath('/dashboard')

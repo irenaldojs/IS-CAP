@@ -3,6 +3,7 @@
 import prisma from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { auth } from '@/auth'
+import { createNotification } from './notifications'
 import fs from 'fs'
 import path from 'path'
 
@@ -62,6 +63,23 @@ export async function createMaterial(data: MaterialInput) {
       mimeType: data.mimeType,
     },
   })
+
+  // Cria notificação de material adicionado
+  try {
+    const subject = await prisma.subject.findUnique({
+      where: { id: data.subjectId },
+      select: { name: true },
+    })
+
+    await createNotification(
+      session.user.id,
+      'material',
+      'Material atualizado',
+      `Novo material "${data.title}" foi adicionado em ${subject?.name || 'Matéria'}.`
+    )
+  } catch (err) {
+    console.error('Erro ao gerar notificação de material:', err)
+  }
 
   revalidatePath('/dashboard/materiais')
   revalidatePath('/dashboard')

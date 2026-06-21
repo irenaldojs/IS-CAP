@@ -1,0 +1,25 @@
+[debug] [2026-06-17T04:41:07.268Z] ----------------------------------------------------------------------
+[debug] [2026-06-17T04:41:07.272Z] Command:       /home/irenaldo/.bun/bin/bun /tmp/bunx-1000-firebase-tools@latest/node_modules/.bin/firebase projects:list --json
+[debug] [2026-06-17T04:41:07.273Z] CLI Version:   15.20.0
+[debug] [2026-06-17T04:41:07.273Z] Platform:      linux
+[debug] [2026-06-17T04:41:07.273Z] Node Version:  v24.3.0
+[debug] [2026-06-17T04:41:07.274Z] Time:          Wed Jun 17 2026 01:41:07 GMT-0300 (Brasilia Standard Time)
+[debug] [2026-06-17T04:41:07.274Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-06-17T04:41:07.988Z] Object "/apphosting" in "firebase.json" is missing required property: {"missingProperty":"backendId"}
+[debug] [2026-06-17T04:41:07.989Z] Field "/apphosting" in "firebase.json" is possibly invalid: must be array
+[debug] [2026-06-17T04:41:07.989Z] Field "/apphosting" in "firebase.json" is possibly invalid: must match a schema in anyOf
+[debug] [2026-06-17T04:41:07.999Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-06-17T04:41:07.999Z] > authorizing via signed-in user (irenaldojs@gmail.com)
+[debug] [2026-06-17T04:41:08.004Z] Checked if tokens are valid: true, expires at: 1781672701618
+[debug] [2026-06-17T04:41:08.005Z] Checked if tokens are valid: true, expires at: 1781672701618
+[debug] [2026-06-17T04:41:08.006Z] Failed to make request: Attempted to assign to readonly property.
+[debug] [2026-06-17T04:41:08.188Z] Error
+    at request (/tmp/bunx-1000-firebase-tools@latest/node_modules/firebase-tools/lib/apiv2.js:149:31)
+    at async getProjectPage (/tmp/bunx-1000-firebase-tools@latest/node_modules/firebase-tools/lib/management/projects.js:287:41)
+    at async getFirebaseProjectPage (/tmp/bunx-1000-firebase-tools@latest/node_modules/firebase-tools/lib/management/projects.js:304:29)
+    at async listFirebaseProjects (/tmp/bunx-1000-firebase-tools@latest/node_modules/firebase-tools/lib/management/projects.js:333:35)
+    at async <anonymous> (/tmp/bunx-1000-firebase-tools@latest/node_modules/firebase-tools/lib/commands/projects-list.js:51:41)
+    at processTicksAndRejections (unknown:7:39)
+[error] 
+[error] Error: Failed to list Firebase projects. See firebase-debug.log for more info.

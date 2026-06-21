@@ -4,57 +4,42 @@ import React, { useState, useRef, useEffect } from "react"
 import { Bell, Check, Trash2, BellOff, Info, Calendar, DollarSign, BookOpen } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-
-interface Notification {
-  id: string
-  title: string
-  description: string
-  time: string
-  type: "info" | "calendar" | "finance" | "material"
-  read: boolean
-}
-
-const initialNotifications: Notification[] = [
-  {
-    id: "1",
-    title: "Novo aluno cadastrado",
-    description: "Ana Carolina completou a matrícula hoje.",
-    time: "5 min atrás",
-    type: "info",
-    read: false,
-  },
-  {
-    id: "2",
-    title: "Aula agendada",
-    description: "Aula experimental com Carlos amanhã às 14h.",
-    time: "2 horas atrás",
-    type: "calendar",
-    read: false,
-  },
-  {
-    id: "3",
-    title: "Pagamento recebido",
-    description: "Mensalidade de Letícia foi confirmada.",
-    time: "1 dia atrás",
-    type: "finance",
-    read: true,
-  },
-  {
-    id: "4",
-    title: "Material atualizado",
-    description: "Novos slides de Álgebra foram adicionados.",
-    time: "2 dias atrás",
-    type: "material",
-    read: true,
-  },
-]
+import {
+  getNotifications,
+  markNotificationAsRead,
+  markAllNotificationsAsRead,
+  deleteNotification as apiDeleteNotification,
+  type NotificationDto as Notification
+} from "@/actions/notifications"
+import { toast } from "sonner"
 
 export default function NotificationBell() {
-  const [notifications, setNotifications] = useState<Notification[]>(initialNotifications)
+  const [notifications, setNotifications] = useState<Notification[]>([])
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   const unreadCount = notifications.filter((n) => !n.read).length
+
+  // Carregar notificações do banco de dados
+  const loadNotifications = async () => {
+    try {
+      const data = await getNotifications()
+      setNotifications(data)
+    } catch (err) {
+      console.error("Erro ao buscar notificações:", err)
+    }
+  }
+
+  // Carregar inicialmente e quando o dropdown for aberto
+  useEffect(() => {
+    loadNotifications()
+  }, [])
+
+  useEffect(() => {
+    if (isOpen) {
+      loadNotifications()
+    }
+  }, [isOpen])
 
   // Fechar o dropdown ao clicar fora
   useEffect(() => {
@@ -74,19 +59,45 @@ export default function NotificationBell() {
 
   const toggleDropdown = () => setIsOpen(!isOpen)
 
-  const markAsRead = (id: string) => {
+  const markAsRead = async (id: string) => {
+    // Atualização otimista
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, read: true } : n))
     )
+    try {
+      await markNotificationAsRead(id)
+    } catch (err) {
+      console.error(err)
+      toast.error("Erro ao marcar notificação como lida.")
+      loadNotifications() // Reverte estado se houver erro
+    }
   }
 
-  const markAllAsRead = () => {
+  const markAllAsRead = async () => {
+    // Atualização otimista
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
+    try {
+      await markAllNotificationsAsRead()
+      toast.success("Todas as notificações marcadas como lidas.")
+    } catch (err) {
+      console.error(err)
+      toast.error("Erro ao marcar notificações como lidas.")
+      loadNotifications() // Reverte
+    }
   }
 
-  const deleteNotification = (id: string, e: React.MouseEvent) => {
+  const deleteNotification = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
+    // Atualização otimista
     setNotifications((prev) => prev.filter((n) => n.id !== id))
+    try {
+      await apiDeleteNotification(id)
+      toast.success("Notificação excluída.")
+    } catch (err) {
+      console.error(err)
+      toast.error("Erro ao excluir notificação.")
+      loadNotifications() // Reverte
+    }
   }
 
   const getIcon = (type: Notification["type"]) => {

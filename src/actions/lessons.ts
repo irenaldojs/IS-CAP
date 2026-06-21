@@ -3,6 +3,7 @@
 import prisma from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { auth } from '@/auth'
+import { createNotification } from './notifications'
 
 export interface LessonInput {
   studentId: string
@@ -95,6 +96,30 @@ export async function createLesson(data: LessonInput) {
   }).catch((err) => {
     console.error('Erro ao criar registro de pagamento para a aula:', err)
   })
+
+  // Busca dados adicionais do aluno e matéria para a mensagem de notificação
+  try {
+    const student = await prisma.student.findUnique({
+      where: { id: data.studentId },
+      select: { name: true },
+    })
+    const subject = await prisma.subject.findUnique({
+      where: { id: data.subjectId },
+      select: { name: true },
+    })
+
+    const dateStr = parsedStartTime.toLocaleDateString('pt-BR')
+    const hourStr = parsedStartTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+
+    await createNotification(
+      session.user.id,
+      'calendar',
+      'Aula agendada',
+      `Aula de ${subject?.name || 'Matéria'} com ${student?.name || 'Aluno'} agendada para ${dateStr} às ${hourStr}.`
+    )
+  } catch (err) {
+    console.error('Erro ao gerar notificação de aula:', err)
+  }
 
   revalidatePath('/dashboard/agenda')
   revalidatePath('/dashboard')
@@ -216,7 +241,7 @@ export async function createRecurringScheduleDb(userId: string, data: {
 
   // 2. Pré-gera 8 semanas de aulas
   const dates = []
-  let current = new Date(firstDate)
+  const current = new Date(firstDate)
   for (let i = 0; i < 8; i++) {
     dates.push(new Date(current))
     current.setDate(current.getDate() + 7)
@@ -252,6 +277,30 @@ export async function createRecurringScheduleDb(userId: string, data: {
         isPaid: false,
       },
     }).catch((err) => console.error('Erro ao criar pagamento recorrente:', err))
+  }
+
+  // Cria notificação de aula recorrente agendada
+  try {
+    const student = await prisma.student.findUnique({
+      where: { id: data.studentId },
+      select: { name: true },
+    })
+    const subject = await prisma.subject.findUnique({
+      where: { id: data.subjectId },
+      select: { name: true },
+    })
+
+    const days = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado']
+    const dayName = days[dayOfWeek]
+
+    await createNotification(
+      userId,
+      'calendar',
+      'Aula recorrente agendada',
+      `Aulas de ${subject?.name || 'Matéria'} com ${student?.name || 'Aluno'} agendadas para todas as ${dayName}s às ${timeString}.`
+    )
+  } catch (err) {
+    console.error('Erro ao gerar notificação de aula recorrente:', err)
   }
 
   return schedule
@@ -316,7 +365,7 @@ export async function updateRecurringScheduleDb(
   for (const lesson of futureLessons) {
     const lessonDate = new Date(lesson.date)
     const currentDay = lessonDate.getDay()
-    let daysToAdd = (data.dayOfWeek - currentDay + 7) % 7
+    const daysToAdd = (data.dayOfWeek - currentDay + 7) % 7
     if (daysToAdd !== 0) {
       lessonDate.setDate(lessonDate.getDate() + daysToAdd)
     }

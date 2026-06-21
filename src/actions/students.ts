@@ -8,6 +8,7 @@ import {
   updateRecurringScheduleDb, 
   deleteRecurringScheduleDb 
 } from './lessons'
+import { createNotification } from './notifications'
 
 // Tipo para criação de estudante
 export interface StudentInput {
@@ -166,6 +167,14 @@ export async function createStudent(data: StudentInput) {
 
     // Sincroniza a Agenda Fixa com as Aulas do Calendário
     await syncStudentFixedSchedule(student.id, session.user.id, data)
+
+    // Cria notificação de sucesso
+    await createNotification(
+      session.user.id,
+      'info',
+      'Novo aluno cadastrado',
+      `${data.name} completou a matrícula hoje.`
+    )
 
     console.log(`[Server Action] createStudent: Aluno cadastrado com sucesso! ID: ${student.id}`)
     revalidatePath('/dashboard/alunos')
