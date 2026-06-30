@@ -1,18 +1,19 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { updateStudent } from '@/actions/students'
+import { getSubjects } from '@/actions/lessons'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
-import { ArrowLeft, Save, Loader2 } from 'lucide-react'
+import { ArrowLeft, Save, Loader2, Plus, Trash2, Calendar, DollarSign, Gift } from 'lucide-react'
 import Link from 'next/link'
 
 // Validação de formulário com Zod
@@ -29,14 +30,11 @@ const studentFormSchema = z.object({
   ),
   gradeLevel: z.string().optional(),
   notes: z.string().optional(),
-  fixedScheduleActive: z.boolean().optional().default(false),
-  fixedScheduleDay: z.string().optional().or(z.literal('')),
-  fixedScheduleTime: z.string().optional().or(z.literal('')),
-  fixedSchedulePrice: z.preprocess(
+  hourlyRate: z.preprocess(
     (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
-    z.number().min(0, 'Preço inválido').optional()
+    z.number().min(0, 'Valor inválido').optional()
   ),
-  fixedScheduleTemporarilyDisabled: z.boolean().optional().default(false),
+  promotion: z.string().optional(),
 })
 
 type StudentFormValues = z.infer<typeof studentFormSchema>
@@ -53,17 +51,36 @@ interface StudentEditFormProps {
     age: number | null
     gradeLevel: string | null
     notes: string | null
-    fixedScheduleActive: boolean
-    fixedScheduleDay: string | null
-    fixedScheduleTime: string | null
-    fixedSchedulePrice: number | null
-    fixedScheduleTemporarilyDisabled: boolean
+    hourlyRate: number | null
+    promotion: string | null
+    subjectIds?: string[]
+    recurringSchedules?: {
+      dayOfWeek: number
+      startTime: string
+      value: number
+      subjectId: string
+    }[]
   }
 }
 
 export function StudentEditForm({ student }: StudentEditFormProps) {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [subjectsList, setSubjectsList] = useState<{ id: string; name: string; color: string }[]>([])
+  
+  // Estados para novas funcionalidades
+  const [selectedSubjects, setSelectedSubjects] = useState<string[]>(student.subjectIds || [])
+  const [recurringSchedules, setRecurringSchedules] = useState<{
+    dayOfWeek: number
+    startTime: string
+    value: number
+    subjectId: string
+  }[]>(student.recurringSchedules || [])
+
+  // Carrega matérias disponíveis
+  useEffect(() => {
+    getSubjects().then(setSubjectsList).catch(console.error)
+  }, [])
 
   const {
     register,
@@ -81,13 +98,42 @@ export function StudentEditForm({ student }: StudentEditFormProps) {
       age: student.age ?? undefined,
       gradeLevel: student.gradeLevel || '',
       notes: student.notes || '',
-      fixedScheduleActive: student.fixedScheduleActive ?? false,
-      fixedScheduleDay: student.fixedScheduleDay || '',
-      fixedScheduleTime: student.fixedScheduleTime || '',
-      fixedSchedulePrice: student.fixedSchedulePrice ?? undefined,
-      fixedScheduleTemporarilyDisabled: student.fixedScheduleTemporarilyDisabled ?? false,
+      hourlyRate: student.hourlyRate ?? undefined,
+      promotion: student.promotion || '',
     },
   })
+
+  // Manipulação de Matérias
+  const handleSubjectToggle = (subjectId: string) => {
+    setSelectedSubjects(prev =>
+      prev.includes(subjectId)
+        ? prev.filter(id => id !== subjectId)
+        : [...prev, subjectId]
+    )
+  }
+
+  // Manipulação de Agenda Fixa
+  const addScheduleRow = () => {
+    setRecurringSchedules(prev => [
+      ...prev,
+      {
+        dayOfWeek: 1, // Segunda
+        startTime: '14:00',
+        value: 80,
+        subjectId: selectedSubjects[0] || (subjectsList[0]?.id || '')
+      }
+    ])
+  }
+
+  const removeScheduleRow = (index: number) => {
+    setRecurringSchedules(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const updateScheduleRow = (index: number, field: string, value: any) => {
+    setRecurringSchedules(prev =>
+      prev.map((item, i) => (i === index ? { ...item, [field]: value } : item))
+    )
+  }
 
   const onSubmit = async (values: StudentFormValues) => {
     setIsSubmitting(true)
@@ -102,11 +148,14 @@ export function StudentEditForm({ student }: StudentEditFormProps) {
         age: values.age,
         gradeLevel: values.gradeLevel || undefined,
         notes: values.notes || undefined,
-        fixedScheduleActive: values.fixedScheduleActive,
-        fixedScheduleDay: values.fixedScheduleDay || undefined,
-        fixedScheduleTime: values.fixedScheduleTime || undefined,
-        fixedSchedulePrice: values.fixedSchedulePrice,
-        fixedScheduleTemporarilyDisabled: values.fixedScheduleTemporarilyDisabled,
+        hourlyRate: values.hourlyRate,
+        promotion: values.promotion || undefined,
+        subjectIds: selectedSubjects,
+        recurringSchedules: recurringSchedules.map(sch => ({
+          ...sch,
+          dayOfWeek: Number(sch.dayOfWeek),
+          value: Number(sch.value)
+        }))
       })
       toast.success('Aluno atualizado com sucesso!')
       router.push(`/dashboard/alunos/${student.id}`)
@@ -178,36 +227,6 @@ export function StudentEditForm({ student }: StudentEditFormProps) {
                     )}
                   </div>
 
-                  {/* E-mail */}
-                  <div className="space-y-1">
-                    <Label htmlFor="email" className="text-slate-300">
-                      E-mail do Aluno
-                    </Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="aluno@exemplo.com"
-                      className="bg-slate-900/50 border-slate-800 text-slate-100 focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20"
-                      {...register('email')}
-                    />
-                    {errors.email && (
-                      <p className="text-xs text-red-400 mt-1">{errors.email.message}</p>
-                    )}
-                  </div>
-
-                  {/* Contato do Aluno */}
-                  <div className="space-y-1">
-                    <Label htmlFor="phone" className="text-slate-300">
-                      Contato do Aluno (WhatsApp/Celular)
-                    </Label>
-                    <Input
-                      id="phone"
-                      placeholder="Ex: (11) 99999-9999"
-                      className="bg-slate-900/50 border-slate-800 text-slate-100 focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20"
-                      {...register('phone')}
-                    />
-                  </div>
-
                   {/* Escola */}
                   <div className="space-y-1">
                     <Label htmlFor="school" className="text-slate-300">
@@ -222,7 +241,7 @@ export function StudentEditForm({ student }: StudentEditFormProps) {
                   </div>
 
                   {/* Série/Ano */}
-                  <div className="space-y-1">
+                  <div className="space-y-1 col-span-2">
                     <Label htmlFor="gradeLevel" className="text-slate-300">
                       Série / Ano Letivo
                     </Label>
@@ -236,7 +255,80 @@ export function StudentEditForm({ student }: StudentEditFormProps) {
                 </div>
               </div>
 
-              {/* Seção 2: Contato dos Responsáveis */}
+              {/* Seção: Matérias do Aluno (Novo) */}
+              <div className="space-y-4 pt-2">
+                <h3 className="text-sm font-semibold text-indigo-400 border-b border-slate-800 pb-2">
+                  Matérias Associadas
+                </h3>
+                {subjectsList.length === 0 ? (
+                  <p className="text-xs text-slate-500">Nenhuma matéria cadastrada.</p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    {subjectsList.map(subject => {
+                      const isSelected = selectedSubjects.includes(subject.id)
+                      return (
+                        <button
+                          key={subject.id}
+                          type="button"
+                          onClick={() => handleSubjectToggle(subject.id)}
+                          className={cn(
+                            "flex items-center gap-2 p-2 rounded-lg border text-left text-xs font-semibold transition-all cursor-pointer",
+                            isSelected
+                              ? "bg-slate-800 border-indigo-550 text-white"
+                              : "bg-slate-950/20 border-slate-850 text-slate-400 hover:text-slate-200"
+                          )}
+                        >
+                          <span
+                            className="size-2.5 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: subject.color }}
+                          />
+                          <span>{subject.name}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Seção: Preços e Promoções (Novo) */}
+              <div className="space-y-4 pt-2">
+                <h3 className="text-sm font-semibold text-indigo-400 border-b border-slate-800 pb-2">
+                  Preço Hora e Promoções
+                </h3>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 bg-slate-950/20 p-4 rounded-lg border border-slate-800/40">
+                  {/* Valor hora customizado */}
+                  <div className="space-y-1">
+                    <Label htmlFor="hourlyRate" className="text-slate-300 flex items-center gap-1">
+                      <DollarSign className="size-3.5 text-indigo-400" />
+                      Valor da Hora Personalizado (R$)
+                    </Label>
+                    <Input
+                      id="hourlyRate"
+                      type="number"
+                      step="0.01"
+                      placeholder="Deixe em branco para usar o padrão"
+                      className="bg-slate-900/50 border-slate-800 text-slate-100 focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20"
+                      {...register('hourlyRate')}
+                    />
+                  </div>
+
+                  {/* Campo de promoção / combo */}
+                  <div className="space-y-1">
+                    <Label htmlFor="promotion" className="text-slate-300 flex items-center gap-1">
+                      <Gift className="size-3.5 text-indigo-400" />
+                      Promoção / Combo Especial
+                    </Label>
+                    <Input
+                      id="promotion"
+                      placeholder="Ex: Combo 4 aulas por R$ 300"
+                      className="bg-slate-900/50 border-slate-800 text-slate-100 focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20"
+                      {...register('promotion')}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Seção: Contato dos Responsáveis */}
               <div className="space-y-4 pt-2">
                 <h3 className="text-sm font-semibold text-indigo-400 border-b border-slate-800 pb-2">
                   Responsáveis & Contato
@@ -267,10 +359,37 @@ export function StudentEditForm({ student }: StudentEditFormProps) {
                       {...register('parentPhone')}
                     />
                   </div>
+                  
+                  {/* E-mail do Aluno */}
+                  <div className="space-y-1">
+                    <Label htmlFor="email" className="text-slate-300">
+                      E-mail do Aluno
+                    </Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="aluno@exemplo.com"
+                      className="bg-slate-900/50 border-slate-800 text-slate-100 focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20"
+                      {...register('email')}
+                    />
+                  </div>
+
+                  {/* Contato do Aluno */}
+                  <div className="space-y-1">
+                    <Label htmlFor="phone" className="text-slate-300">
+                      Contato do Aluno (WhatsApp/Celular)
+                    </Label>
+                    <Input
+                      id="phone"
+                      placeholder="Ex: (11) 99999-9999"
+                      className="bg-slate-900/50 border-slate-800 text-slate-100 focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20"
+                      {...register('phone')}
+                    />
+                  </div>
                 </div>
               </div>
 
-              {/* Seção 3: Notas / Observações */}
+              {/* Seção: Notas / Observações */}
               <div className="space-y-4 pt-2">
                 <h3 className="text-sm font-semibold text-indigo-400 border-b border-slate-800 pb-2">
                   Observações Gerais
@@ -281,99 +400,119 @@ export function StudentEditForm({ student }: StudentEditFormProps) {
                   </Label>
                   <textarea
                     id="notes"
-                    placeholder="Informações adicionais sobre o aluno (dificuldades, horários preferidos, objetivos...)"
-                    className="min-h-24 w-full min-w-0 rounded-lg border border-slate-800 bg-slate-900/50 px-2.5 py-1 text-base transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-indigo-500 focus-visible:ring-3 focus-visible:ring-indigo-500/20 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-slate-900/80 disabled:opacity-50 md:text-sm text-slate-100"
+                    placeholder="Informações adicionais sobre o aluno..."
+                    className="min-h-24 w-full min-w-0 rounded-lg border border-slate-800 bg-slate-900/50 px-2.5 py-1.5 text-base transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-indigo-500 focus-visible:ring-3 focus-visible:ring-indigo-500/20 md:text-sm text-slate-100"
                     {...register('notes')}
                   />
                 </div>
               </div>
 
-              {/* Seção 4: Agenda Fixa (Aula Recorrente) */}
+              {/* Seção: Agenda Fixa (Múltiplos Dias) */}
               <div className="space-y-4 pt-2">
-                <h3 className="text-sm font-semibold text-indigo-400 border-b border-slate-800 pb-2">
-                  Agenda Fixa (Aula Recorrente)
-                </h3>
-                <div className="space-y-4 bg-slate-950/20 p-4 rounded-lg border border-slate-800/40">
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-6">
-                    {/* Ativar */}
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        id="fixedScheduleActive"
-                        className="size-4 rounded border-slate-800 bg-slate-900/50 text-indigo-600 focus:ring-indigo-500/20 cursor-pointer"
-                        {...register('fixedScheduleActive')}
-                      />
-                      <Label htmlFor="fixedScheduleActive" className="text-slate-300 font-medium cursor-pointer">
-                        Ativar Agenda Fixa
-                      </Label>
-                    </div>
-
-                    {/* Desativado Temporariamente */}
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        id="fixedScheduleTemporarilyDisabled"
-                        className="size-4 rounded border-slate-800 bg-slate-900/50 text-indigo-600 focus:ring-indigo-500/20 cursor-pointer"
-                        {...register('fixedScheduleTemporarilyDisabled')}
-                      />
-                      <Label htmlFor="fixedScheduleTemporarilyDisabled" className="text-slate-400 font-medium cursor-pointer">
-                        Desativar Temporariamente (Esta semana não teve aula)
-                      </Label>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                    {/* Dia da Semana */}
-                    <div className="space-y-1">
-                      <Label htmlFor="fixedScheduleDay" className="text-slate-300">
-                        Dia da Semana
-                      </Label>
-                      <select
-                        id="fixedScheduleDay"
-                        className="w-full rounded-lg border border-slate-800 bg-slate-900/50 px-2.5 py-2 text-slate-100 focus:border-indigo-500 focus:ring-indigo-500/20 outline-none text-sm cursor-pointer"
-                        {...register('fixedScheduleDay')}
-                      >
-                        <option value="">Selecione o dia...</option>
-                        <option value="Segunda-feira">Segunda-feira</option>
-                        <option value="Terça-feira">Terça-feira</option>
-                        <option value="Quarta-feira">Quarta-feira</option>
-                        <option value="Quinta-feira">Quinta-feira</option>
-                        <option value="Sexta-feira">Sexta-feira</option>
-                        <option value="Sábado">Sábado</option>
-                        <option value="Domingo">Domingo</option>
-                      </select>
-                    </div>
-
-                    {/* Horário */}
-                    <div className="space-y-1">
-                      <Label htmlFor="fixedScheduleTime" className="text-slate-300">
-                        Horário Reservado
-                      </Label>
-                      <Input
-                        id="fixedScheduleTime"
-                        type="time"
-                        className="bg-slate-900/50 border-slate-800 text-slate-100 focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20"
-                        {...register('fixedScheduleTime')}
-                      />
-                    </div>
-
-                    {/* Valor por Aula */}
-                    <div className="space-y-1">
-                      <Label htmlFor="fixedSchedulePrice" className="text-slate-300">
-                        Preço por Aula (R$)
-                      </Label>
-                      <Input
-                        id="fixedSchedulePrice"
-                        type="number"
-                        step="0.01"
-                        placeholder="Ex: 80,00"
-                        className="bg-slate-900/50 border-slate-800 text-slate-100 focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20"
-                        {...register('fixedSchedulePrice')}
-                      />
-                    </div>
-                  </div>
+                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                  <h3 className="text-sm font-semibold text-indigo-400">
+                    Aulas Recorrentes Semanais (Agenda Fixa)
+                  </h3>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addScheduleRow}
+                    className="border-slate-800 hover:bg-slate-800 text-slate-300 cursor-pointer h-7 text-[10px]"
+                  >
+                    <Plus className="size-3 mr-1" />
+                    Adicionar Aula Fixa
+                  </Button>
                 </div>
+
+                {recurringSchedules.length === 0 ? (
+                  <div className="text-center py-6 bg-slate-950/10 rounded-lg border border-dashed border-slate-800/80">
+                    <Calendar className="size-8 text-slate-700 mx-auto mb-2" />
+                    <p className="text-xs text-slate-500">Sem aulas recorrentes programadas para este aluno.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {recurringSchedules.map((schedule, index) => (
+                      <div
+                        key={index}
+                        className="grid grid-cols-1 sm:grid-cols-12 gap-2 bg-slate-950/10 p-3 rounded-lg border border-slate-850/50 items-end"
+                      >
+                        {/* Dia da Semana */}
+                        <div className="sm:col-span-3 space-y-1">
+                          <Label className="text-[10px] text-slate-400">Dia da Semana</Label>
+                          <select
+                            value={schedule.dayOfWeek}
+                            onChange={(e) => updateScheduleRow(index, 'dayOfWeek', Number(e.target.value))}
+                            className="w-full rounded-lg border border-slate-800 bg-slate-900 px-2 py-1.5 text-slate-200 outline-none text-xs cursor-pointer focus:border-indigo-500"
+                          >
+                            <option value={1}>Segunda-feira</option>
+                            <option value={2}>Terça-feira</option>
+                            <option value={3}>Quarta-feira</option>
+                            <option value={4}>Quinta-feira</option>
+                            <option value={5}>Sexta-feira</option>
+                            <option value={6}>Sábado</option>
+                            <option value={0}>Domingo</option>
+                          </select>
+                        </div>
+
+                        {/* Horário */}
+                        <div className="sm:col-span-2 space-y-1">
+                          <Label className="text-[10px] text-slate-400">Horário</Label>
+                          <Input
+                            type="time"
+                            value={schedule.startTime}
+                            onChange={(e) => updateScheduleRow(index, 'startTime', e.target.value)}
+                            className="bg-slate-900 border-slate-800 text-slate-200 text-xs h-8 px-2"
+                          />
+                        </div>
+
+                        {/* Matéria */}
+                        <div className="sm:col-span-4 space-y-1">
+                          <Label className="text-[10px] text-slate-400">Matéria</Label>
+                          <select
+                            value={schedule.subjectId}
+                            onChange={(e) => updateScheduleRow(index, 'subjectId', e.target.value)}
+                            className="w-full rounded-lg border border-slate-800 bg-slate-900 px-2 py-1.5 text-slate-200 outline-none text-xs cursor-pointer focus:border-indigo-500"
+                          >
+                            {subjectsList
+                              .filter(sub => selectedSubjects.includes(sub.id) || !selectedSubjects.length)
+                              .map(sub => (
+                                <option key={sub.id} value={sub.id}>{sub.name}</option>
+                              ))}
+                            {subjectsList.length === 0 && <option value="">Sem matérias</option>}
+                          </select>
+                        </div>
+
+                        {/* Preço por aula */}
+                        <div className="sm:col-span-2 space-y-1">
+                          <Label className="text-[10px] text-slate-400">Preço Aula (R$)</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={schedule.value}
+                            onChange={(e) => updateScheduleRow(index, 'value', Number(e.target.value))}
+                            className="bg-slate-900 border-slate-800 text-slate-200 text-xs h-8 px-2"
+                          />
+                        </div>
+
+                        {/* Excluir */}
+                        <div className="sm:col-span-1 flex justify-end">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeScheduleRow(index)}
+                            className="text-red-400 hover:text-red-300 hover:bg-red-950/20 cursor-pointer h-8 w-8"
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
+
             </CardContent>
             <CardFooter className="flex items-center justify-end gap-3 border-t border-slate-800 bg-slate-950/20 px-6 py-4">
               <Link href={`/dashboard/alunos/${student.id}`} className={cn(buttonVariants({ variant: 'outline' }), "cursor-pointer")}>

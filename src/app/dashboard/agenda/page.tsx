@@ -7,6 +7,7 @@ import { LessonsDataView } from './agenda-data-view'
 import { LessonDialogFetcher } from './lesson-dialog-fetcher'
 import { AgendaListSkeleton, AgendaCalendarSkeleton } from './agenda-skeleton'
 import { Suspense } from 'react'
+import prisma from '@/lib/prisma'
 
 interface PageProps {
   searchParams: Promise<{
@@ -29,6 +30,13 @@ export default async function AgendaPage({ searchParams }: PageProps) {
   const dateStr = resolvedParams.date || new Date().toISOString().split('T')[0]
   const editLessonId = resolvedParams.editLessonId
 
+  // Busca o preço sugerido do usuário no banco
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { defaultHourlyRate: true },
+  })
+  const defaultHourlyRate = user?.defaultHourlyRate || 80
+
   // Busca apenas metadados rápidos necessários para os dialogs no servidor de forma concorrente
   const [students, subjects] = await Promise.all([
     getStudents(),
@@ -45,6 +53,7 @@ export default async function AgendaPage({ searchParams }: PageProps) {
       date={dateStr}
       students={students}
       subjects={subjects}
+      defaultHourlyRate={defaultHourlyRate}
     >
       <Suspense
         key={suspenseKey}
@@ -65,6 +74,7 @@ export default async function AgendaPage({ searchParams }: PageProps) {
             students={students}
             subjects={subjects}
             onCloseUrl={onCloseUrl}
+            defaultHourlyRate={defaultHourlyRate}
           />
         </Suspense>
       )}

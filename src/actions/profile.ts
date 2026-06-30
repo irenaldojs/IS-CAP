@@ -16,6 +16,7 @@ export async function getUserProfile() {
         id: true,
         name: true,
         email: true,
+        defaultHourlyRate: true,
         createdAt: true,
       },
     })
@@ -27,6 +28,28 @@ export async function getUserProfile() {
     return { success: true, user }
   } catch (error) {
     console.error('Erro ao buscar perfil do usuário:', error)
+    return { error: 'Erro interno do servidor.' }
+  }
+}
+
+export async function updateUserProfile(data: { name: string; defaultHourlyRate: number }) {
+  try {
+    const session = await auth()
+    if (!session || !session.user || !session.user.id) {
+      return { error: 'Não autorizado.' }
+    }
+
+    const user = await prisma.user.update({
+      where: { id: session.user.id },
+      data: {
+        name: data.name,
+        defaultHourlyRate: Number(data.defaultHourlyRate),
+      },
+    })
+
+    return { success: true, user }
+  } catch (error) {
+    console.error('Erro ao atualizar perfil do usuário:', error)
     return { error: 'Erro interno do servidor.' }
   }
 }

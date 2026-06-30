@@ -26,11 +26,20 @@ export default async function EditarAlunoPage({ params }: PageProps) {
     age: student.age,
     gradeLevel: student.gradeLevel,
     notes: student.notes,
+    hourlyRate: student.hourlyRate,
+    promotion: student.promotion,
     fixedScheduleActive: student.fixedScheduleActive,
     fixedScheduleDay: student.fixedScheduleDay,
     fixedScheduleTime: student.fixedScheduleTime,
     fixedSchedulePrice: student.fixedSchedulePrice,
     fixedScheduleTemporarilyDisabled: student.fixedScheduleTemporarilyDisabled,
+    subjectIds: student.subjects.map(s => s.subjectId),
+    recurringSchedules: student.recurringSchedules.map(r => ({
+      dayOfWeek: r.dayOfWeek,
+      startTime: r.startTime,
+      value: r.value,
+      subjectId: r.subjectId
+    })),
   }
 
   return <StudentEditForm student={studentData} />

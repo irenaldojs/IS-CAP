@@ -14,6 +14,7 @@ import {
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { buttonVariants } from '@/components/ui/button'
+import { DatePickerNav } from './date-picker-nav'
 
 interface LessonsDataViewProps {
   view: 'list' | 'calendar'
@@ -329,6 +330,7 @@ export async function LessonsDataView({ view, period, date }: LessonsDataViewPro
               <ChevronRight className="size-3.5" />
             </Link>
           </div>
+          <DatePickerNav currentDate={date} view={view} />
           <div>
             <h2 className="text-sm font-bold text-slate-200 capitalize">
               {formatDateRange()}

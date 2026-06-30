@@ -13,6 +13,7 @@ model User {
   name          String
   email         String         @unique
   passwordHash  String         @map("password_hash")
+  defaultHourlyRate Float      @default(80) @map("default_hourly_rate")
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
 
@@ -48,6 +49,10 @@ model Student {
   createdAt                        DateTime         @default(now()) @map("created_at")
   updatedAt                        DateTime         @updatedAt @map("updated_at")
 
+  // Preço hora customizado e promoções
+  hourlyRate  Float?           @map("hourly_rate")
+  promotion   String?          @map("promotion")
+
   // Agenda Fixa (Aula Recorrente)
   fixedScheduleActive              Boolean          @default(false) @map("fixed_schedule_active")
   fixedScheduleDay                 String?          @map("fixed_schedule_day")
@@ -75,6 +80,7 @@ model Subject {
 
   students  StudentSubject[]
   lessons   Lesson[]
+  lessonSubjects LessonSubject[]
   materials Material[]
   exams     Exam[]
   grades    Grade[]
@@ -147,6 +153,7 @@ model Lesson {
   updatedAt         DateTime           @updatedAt @map("updated_at")
 
   payment           Payment?
+  subjects          LessonSubject[]
 
   @@index([date])
   @@index([status])
@@ -276,4 +283,15 @@ model Notification {
 
   @@index([isRead, createdAt])
   @@map("notifications")
+}
+
+model LessonSubject {
+  id        String  @id @default(uuid())
+  lessonId  String  @map("lesson_id")
+  lesson    Lesson  @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  subjectId String  @map("subject_id")
+  subject   Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@unique([lessonId, subjectId])
+  @@map("lesson_subjects")
 }

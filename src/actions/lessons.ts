@@ -8,6 +8,7 @@ import { createNotification } from './notifications'
 export interface LessonInput {
   studentId: string
   subjectId: string
+  subjectIds?: string[]
   packageId?: string | null
   date: Date | string
   startTime: Date | string
@@ -34,6 +35,8 @@ export async function getLessons() {
           id: true,
           name: true,
           email: true,
+          hourlyRate: true,
+          promotion: true,
         },
       },
       subject: {
@@ -41,6 +44,11 @@ export async function getLessons() {
           id: true,
           name: true,
           color: true,
+        },
+      },
+      subjects: {
+        include: {
+          subject: true,
         },
       },
       recurringSchedule: {
@@ -68,11 +76,16 @@ export async function createLesson(data: LessonInput) {
   const parsedDate = new Date(data.date)
   const parsedStartTime = new Date(data.startTime)
 
+  let primarySubjectId = data.subjectId
+  if (data.subjectIds && data.subjectIds.length > 0 && !primarySubjectId) {
+    primarySubjectId = data.subjectIds[0]
+  }
+
   const lesson = await prisma.lesson.create({
     data: {
       userId: session.user.id,
       studentId: data.studentId,
-      subjectId: data.subjectId,
+      subjectId: primarySubjectId,
       packageId: data.packageId || null,
       date: parsedDate,
       startTime: parsedStartTime,
@@ -84,6 +97,16 @@ export async function createLesson(data: LessonInput) {
       notes: data.notes || null,
     },
   })
+
+  // Sincroniza tabela LessonSubject
+  if (data.subjectIds && data.subjectIds.length > 0) {
+    await prisma.lessonSubject.createMany({
+      data: data.subjectIds.map(subId => ({
+        lessonId: lesson.id,
+        subjectId: subId
+      }))
+    })
+  }
 
   // Se a aula gerar um pagamento pendente
   await prisma.payment.create({
@@ -104,7 +127,7 @@ export async function createLesson(data: LessonInput) {
       select: { name: true },
     })
     const subject = await prisma.subject.findUnique({
-      where: { id: data.subjectId },
+      where: { id: primarySubjectId },
       select: { name: true },
     })
 
@@ -134,11 +157,16 @@ export async function updateLesson(id: string, data: LessonInput) {
   const parsedDate = new Date(data.date)
   const parsedStartTime = new Date(data.startTime)
 
+  let primarySubjectId = data.subjectId
+  if (data.subjectIds && data.subjectIds.length > 0) {
+    primarySubjectId = data.subjectIds[0]
+  }
+
   const lesson = await prisma.lesson.update({
     where: { id },
     data: {
       studentId: data.studentId,
-      subjectId: data.subjectId,
+      subjectId: primarySubjectId,
       packageId: data.packageId || null,
       date: parsedDate,
       startTime: parsedStartTime,
@@ -150,6 +178,20 @@ export async function updateLesson(id: string, data: LessonInput) {
       notes: data.notes || null,
     },
   })
+
+  // Atualiza matérias na tabela LessonSubject
+  await prisma.lessonSubject.deleteMany({
+    where: { lessonId: id }
+  })
+
+  if (data.subjectIds && data.subjectIds.length > 0) {
+    await prisma.lessonSubject.createMany({
+      data: data.subjectIds.map(subId => ({
+        lessonId: id,
+        subjectId: subId
+      }))
+    })
+  }
 
   // Sincroniza o valor do pagamento caso tenha mudado e ainda não esteja pago
   const payment = await prisma.payment.findUnique({ where: { lessonId: id } })

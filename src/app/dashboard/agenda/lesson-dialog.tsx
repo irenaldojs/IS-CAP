@@ -16,15 +16,16 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
-import { X, Loader2, Calendar, Clock, DollarSign, BookOpen, User, Video, MapPin, Trash2, Repeat } from 'lucide-react'
+import { X, Loader2, Calendar, Clock, DollarSign, BookOpen, User, Video, MapPin, Trash2, Repeat, Gift } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 // Zod Form Validation
 const lessonFormSchema = z.object({
   studentId: z.string().min(1, 'Selecione um aluno'),
-  subjectId: z.string().min(1, 'Selecione uma matéria'),
+  subjectId: z.string().optional(),
   date: z.string().min(1, 'Selecione uma data'),
   time: z.string().min(1, 'Selecione o horário de início'),
-  durationHours: z.coerce.number().min(0.5, 'Mínimo de 0.5 horas').max(24, 'Máximo de 24 horas'),
+  durationHours: z.coerce.number().min(0.1, 'Mínimo de 0.1 hora').max(24, 'Máximo de 24 horas'),
   value: z.coerce.number().min(0, 'Valor não pode ser negativo'),
   modality: z.string().min(1, 'Selecione a modalidade'),
   status: z.string().optional(),
@@ -37,6 +38,8 @@ type LessonFormValues = z.infer<typeof lessonFormSchema>
 interface Student {
   id: string
   name: string
+  hourlyRate?: number | null
+  promotion?: string | null
 }
 
 interface Subject {
@@ -56,6 +59,7 @@ interface Lesson {
   notes: string | null
   studentId: string
   subjectId: string
+  subjectIds?: string[]
   recurrence: string | null
   recurringScheduleId?: string | null
 }
@@ -66,6 +70,7 @@ interface LessonDialogProps {
   students: Student[]
   subjects: Subject[]
   editingLesson?: Lesson | null
+  defaultHourlyRate?: number
 }
 
 export function LessonDialog({
@@ -74,17 +79,22 @@ export function LessonDialog({
   students,
   subjects,
   editingLesson,
+  defaultHourlyRate = 80,
 }: LessonDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [scheduleType, setScheduleType] = useState<'AVULSA' | 'SEMANAL'>('AVULSA')
   const [editOption, setEditOption] = useState<'INSTANCE' | 'SERIES'>('INSTANCE')
+  
+  // Estado para múltiplos temas/matérias selecionados
+  const [selectedSubjects, setSelectedSubjects] = useState<string[]>([])
 
   const {
     register,
     handleSubmit,
     setValue,
     reset,
+    watch,
     formState: { errors },
   } = useForm<LessonFormValues>({
     resolver: zodResolver(lessonFormSchema) as any,
@@ -102,6 +112,20 @@ export function LessonDialog({
     },
   })
 
+  // Assistir mudanças de aluno e duração para auto-preenchimento
+  const watchedStudentId = watch('studentId')
+  const watchedDurationHours = watch('durationHours')
+
+  const selectedStudent = students.find(s => s.id === watchedStudentId)
+
+  // Auto-preenche o preço quando aluno ou duração mudar
+  useEffect(() => {
+    if (watchedStudentId && watchedDurationHours) {
+      const studentRate = selectedStudent?.hourlyRate ?? defaultHourlyRate
+      setValue('value', Number((watchedDurationHours * studentRate).toFixed(2)))
+    }
+  }, [watchedStudentId, watchedDurationHours, selectedStudent, defaultHourlyRate, setValue])
+
   // Popula formulário se estiver em modo de edição
   useEffect(() => {
     if (editingLesson) {
@@ -113,6 +137,7 @@ export function LessonDialog({
       
       setScheduleType(editingLesson.recurringScheduleId ? 'SEMANAL' : 'AVULSA')
       setEditOption('INSTANCE')
+      setSelectedSubjects(editingLesson.subjectIds || [editingLesson.subjectId])
 
       reset({
         studentId: editingLesson.studentId,
@@ -129,22 +154,36 @@ export function LessonDialog({
     } else {
       setScheduleType('AVULSA')
       setEditOption('INSTANCE')
+      setSelectedSubjects([])
       reset({
         studentId: '',
         subjectId: '',
         date: new Date().toISOString().split('T')[0],
         time: '14:00',
         durationHours: 1.5,
-        value: 80,
+        value: defaultHourlyRate * 1.5,
         modality: 'ONLINE',
         status: 'AGENDADA',
         recurrence: null,
         notes: '',
       })
     }
-  }, [editingLesson, reset, isOpen])
+  }, [editingLesson, reset, isOpen, defaultHourlyRate])
+
+  const handleSubjectToggle = (subjectId: string) => {
+    setSelectedSubjects(prev =>
+      prev.includes(subjectId)
+        ? prev.filter(id => id !== subjectId)
+        : [...prev, subjectId]
+    )
+  }
 
   const onSubmit = async (values: LessonFormValues) => {
+    if (selectedSubjects.length === 0) {
+      toast.error('Selecione pelo menos uma matéria para a aula.')
+      return
+    }
+
     setIsSubmitting(true)
     try {
       // Concatena data e hora em objetos DateTime correspondentes
@@ -152,7 +191,7 @@ export function LessonDialog({
 
       if (editingLesson) {
         if (editingLesson.recurringScheduleId && editOption === 'SERIES') {
-          // Atualiza a recorrência inteira
+          // Converte data de início para os valores novos
           const firstDate = new Date(combinedDateTime)
           const dayOfWeek = firstDate.getDay()
           const timeString = firstDate.toTimeString().split(' ')[0].substring(0, 5) // HH:MM
@@ -169,7 +208,8 @@ export function LessonDialog({
           // Atualiza apenas a instância selecionada
           const lessonInput = {
             studentId: values.studentId,
-            subjectId: values.subjectId,
+            subjectId: selectedSubjects[0],
+            subjectIds: selectedSubjects,
             date: combinedDateTime,
             startTime: combinedDateTime,
             durationHours: values.durationHours,
@@ -187,7 +227,7 @@ export function LessonDialog({
         if (scheduleType === 'SEMANAL') {
           await createRecurringSchedule({
             studentId: values.studentId,
-            subjectId: values.subjectId,
+            subjectId: selectedSubjects[0],
             startDate: combinedDateTime,
             durationHours: values.durationHours,
             value: values.value,
@@ -198,7 +238,8 @@ export function LessonDialog({
         } else {
           const lessonInput = {
             studentId: values.studentId,
-            subjectId: values.subjectId,
+            subjectId: selectedSubjects[0],
+            subjectIds: selectedSubjects,
             date: combinedDateTime,
             startTime: combinedDateTime,
             durationHours: values.durationHours,
@@ -370,27 +411,35 @@ export function LessonDialog({
               )}
             </div>
 
-            {/* Subject Select */}
-            <div className="space-y-1">
-              <Label htmlFor="subjectId" className="text-slate-300 text-xs font-semibold flex items-center gap-1.5">
-                <BookOpen className="size-3.5 text-indigo-400" /> Matéria <span className="text-red-500">*</span>
+            {/* Multiple Subject Checkboxes */}
+            <div className="space-y-1.5">
+              <Label className="text-slate-300 text-xs font-semibold flex items-center gap-1.5">
+                <BookOpen className="size-3.5 text-indigo-400" /> Matérias da Aula <span className="text-red-500">*</span>
               </Label>
-              <select
-                id="subjectId"
-                disabled={!!(editingLesson?.recurringScheduleId && editOption === 'SERIES')}
-                className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all disabled:opacity-50"
-                {...register('subjectId')}
-              >
-                <option value="">Selecione a matéria...</option>
-                {subjects.map((sub) => (
-                  <option key={sub.id} value={sub.id}>
-                    {sub.name}
-                  </option>
-                ))}
-              </select>
-              {errors.subjectId && (
-                <p className="text-xs text-red-400 mt-1">{errors.subjectId.message}</p>
-              )}
+              <div className="grid grid-cols-2 gap-2 max-h-36 overflow-y-auto bg-slate-950/50 p-2.5 rounded-lg border border-slate-805">
+                {subjects.map((sub) => {
+                  const isChecked = selectedSubjects.includes(sub.id)
+                  return (
+                    <button
+                      key={sub.id}
+                      type="button"
+                      onClick={() => handleSubjectToggle(sub.id)}
+                      className={cn(
+                        "flex items-center gap-2 p-1.5 rounded border text-left text-xs font-medium transition-all cursor-pointer",
+                        isChecked
+                          ? "bg-slate-800/80 border-indigo-650 text-white"
+                          : "bg-slate-950/20 border-slate-900 text-slate-400 hover:text-slate-200"
+                      )}
+                    >
+                      <span 
+                        className="size-2 rounded-full flex-shrink-0" 
+                        style={{ backgroundColor: sub.color }} 
+                      />
+                      <span>{sub.name}</span>
+                    </button>
+                  )
+                })}
+              </div>
             </div>
 
             {/* Date & Time Grid */}
@@ -418,6 +467,7 @@ export function LessonDialog({
                 <Input
                   id="time"
                   type="time"
+                  step="60"
                   className="bg-slate-950 border-slate-800 text-slate-200 focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20"
                   {...register('time')}
                 />
@@ -436,7 +486,7 @@ export function LessonDialog({
                 <Input
                   id="durationHours"
                   type="number"
-                  step="0.5"
+                  step="any"
                   className="bg-slate-950 border-slate-800 text-slate-200 focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20"
                   {...register('durationHours')}
                 />
@@ -452,7 +502,7 @@ export function LessonDialog({
                 <Input
                   id="value"
                   type="number"
-                  step="5"
+                  step="0.01"
                   className="bg-slate-950 border-slate-800 text-slate-200 focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20"
                   {...register('value')}
                 />
@@ -462,6 +512,17 @@ export function LessonDialog({
               </div>
             </div>
 
+            {/* Promotion Helper Banner */}
+            {selectedStudent?.promotion && (
+              <div className="flex items-start gap-2 bg-indigo-950/20 border border-indigo-900/40 p-2.5 rounded-lg">
+                <Gift className="size-4 text-indigo-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-indigo-400 block tracking-wider leading-none">Combo / Promoção do Aluno</span>
+                  <span className="text-slate-300 text-xs mt-1 block">{selectedStudent.promotion}</span>
+                </div>
+              </div>
+            )}
+
             {/* Modality & Status Grid */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
@@ -470,7 +531,7 @@ export function LessonDialog({
                 </Label>
                 <select
                   id="modality"
-                  className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                  className="w-full rounded-lg border border-slate-800 bg-slate-955 px-3 py-2 text-sm text-slate-200 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
                   {...register('modality')}
                 >
                   <option value="ONLINE">Online (Vídeo)</option>
@@ -505,7 +566,7 @@ export function LessonDialog({
               </Label>
               <textarea
                 id="notes"
-                placeholder="Conteúdo planejado para a aula, links importantes ou observações..."
+                placeholder="Conteúdo planejado para a aula, observações..."
                 className="w-full min-h-20 rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all resize-y"
                 {...register('notes')}
               />
@@ -514,7 +575,7 @@ export function LessonDialog({
           </div>
 
           {/* Footer Actions */}
-          <div className="flex items-center justify-between border-t border-slate-800 bg-slate-950/40 px-6 py-4">
+          <div className="flex items-center justify-between border-t border-slate-800 bg-slate-955/40 px-6 py-4">
             <div>
               {editingLesson && (
                 <Button
@@ -522,12 +583,12 @@ export function LessonDialog({
                   variant="ghost"
                   onClick={handleDelete}
                   disabled={isDeleting || isSubmitting}
-                  className="text-red-400 hover:text-red-300 hover:bg-red-950/20 cursor-pointer"
+                  className="text-red-400 hover:text-red-300 hover:bg-red-955/20 cursor-pointer text-xs h-9 px-3"
                 >
                   {isDeleting ? (
                     <Loader2 className="size-4 animate-spin" />
                   ) : (
-                    <Trash2 className="size-4 mr-2" />
+                    <Trash2 className="size-4 mr-1.5" />
                   )}
                   {editingLesson.recurringScheduleId && editOption === 'SERIES' ? 'Excluir Série' : 'Excluir Aula'}
                 </Button>
@@ -540,14 +601,14 @@ export function LessonDialog({
                 variant="outline"
                 onClick={onClose}
                 disabled={isSubmitting || isDeleting}
-                className="cursor-pointer"
+                className="cursor-pointer text-xs h-9"
               >
                 Cancelar
               </Button>
               <Button
                 type="submit"
                 disabled={isSubmitting || isDeleting}
-                className="bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer shadow-md shadow-indigo-600/15"
+                className="bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer shadow-md shadow-indigo-600/15 text-xs h-9"
               >
                 {isSubmitting ? (
                   <>

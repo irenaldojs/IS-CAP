@@ -52,4 +52,6 @@ skills-lock.json
 # Local uploads
 public/uploads/
 
+# Dynamically generated Prisma schema for local development
+/prisma/schema.dev.prisma
 

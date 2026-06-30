@@ -1,0 +1,14 @@
+1 - Cadastro de alunos:
+ * colocar mais de uma materia
+ * colocar mais de um dia na semana de aula fixa
+2 - Preço Hora a aula e promoções:
+ * deixar um preço fixo ( sugestão ) a hora da aula,
+ * criar campo de promoção / combo
+ * quando agendar uma aula, o preço ja vai ser preenchido, mas pode ser editado manualmente se quiser.
+3 - Calendário:
+ * deixar digitar a data para pular diretamente a semana daquela data ( sem precisar ficar usando a paginação ) o usuario decise se usa paginação ou digita uma data
+4 - Editar aula agentada:
+ * poder marcar mais de uma matéria.
+ * no valor da aula, poder aceitar qualquer valor manualmente, o preço fixo vai ser preenchido automativamente mas o professor pode editar manualmente.
+ * aceitar hora quebrada de hora e minuto, ex: 15:45
+ *

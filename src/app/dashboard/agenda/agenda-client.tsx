@@ -27,6 +27,7 @@ interface AgendaClientProps {
   view: 'list' | 'calendar'
   period: 'all' | 'today' | 'week' | 'upcoming'
   date: string
+  defaultHourlyRate: number
   children: React.ReactNode
 }
 
@@ -36,6 +37,7 @@ export function AgendaClient({
   view,
   period,
   date,
+  defaultHourlyRate,
   children,
 }: AgendaClientProps) {
   const router = useRouter()
@@ -141,6 +143,7 @@ export function AgendaClient({
         students={students}
         subjects={subjects}
         editingLesson={null}
+        defaultHourlyRate={defaultHourlyRate}
       />
     </div>
   )

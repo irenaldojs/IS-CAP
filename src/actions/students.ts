@@ -21,14 +21,18 @@ export interface StudentInput {
   age?: number
   gradeLevel?: string
   notes?: string
-  fixedScheduleActive?: boolean
-  fixedScheduleDay?: string | null
-  fixedScheduleTime?: string | null
-  fixedSchedulePrice?: number | null
-  fixedScheduleTemporarilyDisabled?: boolean
+  promotion?: string
+  hourlyRate?: number
+  subjectIds?: string[]
+  recurringSchedules?: {
+    dayOfWeek: number
+    startTime: string
+    value: number
+    subjectId: string
+  }[]
 }
 
-// Helpers para sincronização de Agenda Fixa
+// Helpers para sincronização de Agenda Fixa e Matérias
 function mapDayStringToNumber(dayStr: string): number {
   switch (dayStr.toLowerCase()) {
     case 'domingo': return 0;
@@ -60,67 +64,46 @@ function getNextDayOfWeekDate(dayOfWeek: number, timeStr: string): Date {
   return resultDate
 }
 
-async function syncStudentFixedSchedule(studentId: string, userId: string, data: StudentInput) {
-  // Procura se já existe uma recorrência para este aluno
-  const existingSchedule = await prisma.recurringSchedule.findFirst({
-    where: { studentId },
+async function syncStudentSubjects(studentId: string, subjectIds: string[]) {
+  // Remove associações antigas
+  await prisma.studentSubject.deleteMany({
+    where: { studentId }
   })
 
-  if (data.fixedScheduleActive) {
-    const dayOfWeek = mapDayStringToNumber(data.fixedScheduleDay || 'Segunda-feira')
-    const timeStr = data.fixedScheduleTime || '14:00'
-    const value = data.fixedSchedulePrice ? Number(data.fixedSchedulePrice) : 80
-    const modality = 'ONLINE'
-
-    // Localiza ou cria matéria para vincular
-    let subjectId = ''
-    const studentSub = await prisma.studentSubject.findFirst({
-      where: { studentId },
+  // Adiciona as novas associações
+  if (subjectIds && subjectIds.length > 0) {
+    await prisma.studentSubject.createMany({
+      data: subjectIds.map(subjectId => ({
+        studentId,
+        subjectId
+      }))
     })
+  }
+}
 
-    if (studentSub) {
-      subjectId = studentSub.subjectId
-    } else {
-      let sub = await prisma.subject.findFirst({
-        where: { userId },
-      })
-      if (!sub) {
-        sub = await prisma.subject.create({
-          data: {
-            userId,
-            name: 'Geral',
-            color: '#6366f1',
-          },
-        })
-      }
-      subjectId = sub.id
-      await prisma.studentSubject.create({
-        data: { studentId, subjectId }
-      }).catch(() => {})
-    }
+async function syncStudentRecurringSchedules(studentId: string, userId: string, schedules?: { dayOfWeek: number; startTime: string; value: number; subjectId: string }[]) {
+  // Busca agendamentos recorrentes antigos
+  const existingSchedules = await prisma.recurringSchedule.findMany({
+    where: { studentId }
+  })
 
-    if (existingSchedule) {
-      await updateRecurringScheduleDb(userId, existingSchedule.id, {
-        dayOfWeek,
-        startTime: timeStr,
-        durationHours: 1.5,
-        value,
-        modality,
-      })
-    } else {
-      const startDate = getNextDayOfWeekDate(dayOfWeek, timeStr)
+  // Limpa agendamentos antigos e as respectivas aulas futuras
+  for (const esc of existingSchedules) {
+    await deleteRecurringScheduleDb(userId, esc.id)
+  }
+
+  // Cria novos agendamentos recorrentes
+  if (schedules && schedules.length > 0) {
+    for (const sc of schedules) {
+      const firstDate = getNextDayOfWeekDate(sc.dayOfWeek, sc.startTime)
       await createRecurringScheduleDb(userId, {
         studentId,
-        subjectId,
-        startDate,
+        subjectId: sc.subjectId,
+        startDate: firstDate,
         durationHours: 1.5,
-        value,
-        modality,
+        value: sc.value,
+        modality: 'ONLINE',
       })
-    }
-  } else {
-    if (existingSchedule) {
-      await deleteRecurringScheduleDb(userId, existingSchedule.id)
     }
   }
 }
@@ -157,16 +140,23 @@ export async function createStudent(data: StudentInput) {
         gradeLevel: data.gradeLevel || null,
         notes: data.notes || null,
         active: true,
-        fixedScheduleActive: data.fixedScheduleActive ?? false,
-        fixedScheduleDay: data.fixedScheduleDay || null,
-        fixedScheduleTime: data.fixedScheduleTime || null,
-        fixedSchedulePrice: data.fixedSchedulePrice ? Number(data.fixedSchedulePrice) : null,
-        fixedScheduleTemporarilyDisabled: data.fixedScheduleTemporarilyDisabled ?? false,
+        hourlyRate: data.hourlyRate ? Number(data.hourlyRate) : null,
+        promotion: data.promotion || null,
+        fixedScheduleActive: false,
+        fixedScheduleDay: null,
+        fixedScheduleTime: null,
+        fixedSchedulePrice: null,
+        fixedScheduleTemporarilyDisabled: false,
       },
     })
 
+    // Sincroniza as matérias
+    if (data.subjectIds) {
+      await syncStudentSubjects(student.id, data.subjectIds)
+    }
+
     // Sincroniza a Agenda Fixa com as Aulas do Calendário
-    await syncStudentFixedSchedule(student.id, session.user.id, data)
+    await syncStudentRecurringSchedules(student.id, session.user.id, data.recurringSchedules)
 
     // Cria notificação de sucesso
     await createNotification(
@@ -218,18 +208,20 @@ export async function updateStudent(id: string, data: StudentInput) {
         age: data.age ? Number(data.age) : null,
         gradeLevel: data.gradeLevel || null,
         notes: data.notes || null,
-        fixedScheduleActive: data.fixedScheduleActive ?? false,
-        fixedScheduleDay: data.fixedScheduleDay || null,
-        fixedScheduleTime: data.fixedScheduleTime || null,
-        fixedSchedulePrice: data.fixedSchedulePrice ? Number(data.fixedSchedulePrice) : null,
-        fixedScheduleTemporarilyDisabled: data.fixedScheduleTemporarilyDisabled ?? false,
+        hourlyRate: data.hourlyRate ? Number(data.hourlyRate) : null,
+        promotion: data.promotion || null,
       },
     })
 
-    // Sincroniza a Agenda Fixa com as Aulas do Calendário
-    await syncStudentFixedSchedule(student.id, session.user.id, data)
+    // Sincroniza as matérias
+    if (data.subjectIds) {
+      await syncStudentSubjects(student.id, data.subjectIds)
+    }
 
-    console.log(`[Server Action] updateStudent: Aluno cadastrado com sucesso! ID: ${student.id}`)
+    // Sincroniza a Agenda Fixa com as Aulas do Calendário
+    await syncStudentRecurringSchedules(student.id, session.user.id, data.recurringSchedules)
+
+    console.log(`[Server Action] updateStudent: Aluno atualizado com sucesso! ID: ${student.id}`)
     revalidatePath('/dashboard/alunos')
     revalidatePath(`/dashboard/alunos/${id}`)
     return student
@@ -281,6 +273,14 @@ export async function getStudentById(id: string) {
         subjects: {
           include: {
             subject: true,
+          },
+        },
+        recurringSchedules: {
+          include: {
+            subject: true,
+          },
+          orderBy: {
+            dayOfWeek: 'asc',
           },
         },
         lessons: {

@@ -8,6 +8,7 @@ interface LessonDialogWrapperProps {
   students: any[]
   subjects: any[]
   onCloseUrl: string
+  defaultHourlyRate: number
 }
 
 export function LessonDialogWrapper({
@@ -15,6 +16,7 @@ export function LessonDialogWrapper({
   students,
   subjects,
   onCloseUrl,
+  defaultHourlyRate,
 }: LessonDialogWrapperProps) {
   const router = useRouter()
 
@@ -29,6 +31,7 @@ export function LessonDialogWrapper({
       students={students}
       subjects={subjects}
       editingLesson={lesson}
+      defaultHourlyRate={defaultHourlyRate}
     />
   )
 }

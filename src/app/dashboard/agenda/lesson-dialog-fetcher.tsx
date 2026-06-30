@@ -6,6 +6,7 @@ interface LessonDialogFetcherProps {
   students: any[]
   subjects: any[]
   onCloseUrl: string
+  defaultHourlyRate: number
 }
 
 export async function LessonDialogFetcher({
@@ -13,18 +14,29 @@ export async function LessonDialogFetcher({
   students,
   subjects,
   onCloseUrl,
+  defaultHourlyRate,
 }: LessonDialogFetcherProps) {
   const lesson = await prisma.lesson.findUnique({
     where: { id },
+    include: {
+      subjects: {
+        include: {
+          subject: true,
+        },
+      },
+    },
   })
 
   if (!lesson) return null
 
   // Mapeia datas do Prisma para Date antes de passar para o Client Component
+  // E também mapeia o array de subjects selecionados
+  const subjectIds = lesson.subjects ? lesson.subjects.map((ls: any) => ls.subjectId) : []
   const serializedLesson = {
     ...lesson,
     date: new Date(lesson.date),
     startTime: new Date(lesson.startTime),
+    subjectIds,
   }
 
   return (
@@ -33,6 +45,7 @@ export async function LessonDialogFetcher({
       students={students}
       subjects={subjects}
       onCloseUrl={onCloseUrl}
+      defaultHourlyRate={defaultHourlyRate}
     />
   )
 }
