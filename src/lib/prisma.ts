@@ -1,19 +1,14 @@
 import { PrismaClient } from '@prisma/client'
-import { PrismaLibSql } from '@prisma/adapter-libsql'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { Pool } from 'pg'
 
 const prismaClientSingleton = () => {
-  const dbUrl = process.env.DATABASE_URL || ''
-  
-  if (dbUrl.startsWith('file:')) {
-    // Para SQLite local, utiliza o adaptador de LibSQL passando as configurações diretamente
-    const adapter = new PrismaLibSql({ url: dbUrl })
-    return new PrismaClient({ adapter })
-  }
-
-  // Para PostgreSQL/Supabase em produção
-  const pool = new Pool({ connectionString: dbUrl })
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    max: 10, // conn-pooling
+    idleTimeoutMillis: 30000, // conn-idle-timeout
+    connectionTimeoutMillis: 2000,
+  })
   const adapter = new PrismaPg(pool)
   return new PrismaClient({ adapter })
 }

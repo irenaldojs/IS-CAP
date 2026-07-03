@@ -3,7 +3,6 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 import { SessionProvider } from 'next-auth/react'
 import { Toaster } from 'sonner'
-import FirebaseAnalytics from '@/components/firebase-analytics'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -34,7 +33,6 @@ export default function RootLayout({
         <SessionProvider>
           {children}
           <Toaster richColors position="top-right" closeButton />
-          <FirebaseAnalytics />
         </SessionProvider>
       </body>
     </html>
