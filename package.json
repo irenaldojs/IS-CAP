@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "dotenv -e .env.development -- next dev --webpack",
     "build": "prisma db push && next build --webpack",
-    "start": "dotenv -e .env.development -- next start",
+    "start": "dotenv -e .env.production -- next start",
     "lint": "eslint"
   },
   "dependencies": { 
