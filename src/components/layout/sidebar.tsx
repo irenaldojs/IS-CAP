@@ -75,7 +75,7 @@ export default function Sidebar() {
               <Icon
                 className={cn(
                   "size-5.5 shrink-0 transition-all duration-200 group-hover:scale-110",
-                  isActive ? "text-sidebar-primary scale-105" : "text-muted-foreground"
+                  isActive ? "text-blue-500 dark:text-blue-400 scale-105" : "text-muted-foreground"
                 )}
               />
 
