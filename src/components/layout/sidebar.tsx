@@ -45,7 +45,7 @@ export default function Sidebar() {
   const pathname = usePathname()
 
   return (
-    <aside className="relative flex w-16 flex-col items-center border-r border-sidebar-border bg-sidebar py-4 text-sidebar-foreground select-none shrink-0 shadow-lg">
+    <aside className="relative z-30 flex w-16 flex-col items-center border-r border-sidebar-border bg-sidebar py-4 text-sidebar-foreground select-none shrink-0 shadow-lg">
       {/* Header / Logo */}
       <div className="flex h-12 items-center justify-center mb-6">
         <Link href="/dashboard/alunos" className="flex items-center justify-center">
