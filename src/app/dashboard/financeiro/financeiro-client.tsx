@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createExpense } from '@/actions/financeiro'
+import { updateDefaultHourlyRate } from '@/actions/profile'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -16,6 +17,9 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  DollarSign,
+  Edit3,
+  Check,
 } from 'lucide-react'
 
 // Validação de despesas com Zod
@@ -39,6 +43,7 @@ interface FinanceiroClientProps {
   children: React.ReactNode
   month: number
   year: number
+  defaultHourlyRate: number
 }
 
 export function FinanceiroClient({
@@ -48,10 +53,49 @@ export function FinanceiroClient({
   children,
   month,
   year,
+  defaultHourlyRate,
 }: FinanceiroClientProps) {
   const router = useRouter()
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Estados do valor hora base
+  const [currentHourlyRate, setCurrentHourlyRate] = useState(defaultHourlyRate)
+  const [isEditingRate, setIsEditingRate] = useState(false)
+  const [rateInput, setRateInput] = useState(defaultHourlyRate.toString())
+  const [isUpdatingRate, setIsUpdatingRate] = useState(false)
+
+  // Sincroniza o estado caso o valor mude externamente/servidor
+  useEffect(() => {
+    setCurrentHourlyRate(defaultHourlyRate)
+  }, [defaultHourlyRate])
+
+  const handleRateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const parsedRate = parseFloat(rateInput)
+    if (isNaN(parsedRate) || parsedRate < 0) {
+      toast.error('Por favor, insira um valor válido.')
+      return
+    }
+
+    setIsUpdatingRate(true)
+    try {
+      const result = await updateDefaultHourlyRate(parsedRate)
+      if (result.success && result.defaultHourlyRate !== undefined) {
+        setCurrentHourlyRate(result.defaultHourlyRate)
+        toast.success(`Valor hora base atualizado para R$ ${result.defaultHourlyRate.toFixed(2)}`)
+        setIsEditingRate(false)
+        router.refresh()
+      } else {
+        toast.error(result.error || 'Erro ao atualizar valor.')
+      }
+    } catch (err) {
+      console.error(err)
+      toast.error('Erro de conexão ao atualizar valor.')
+    } finally {
+      setIsUpdatingRate(false)
+    }
+  }
 
   const {
     register,
@@ -145,14 +189,74 @@ export function FinanceiroClient({
             Acompanhe o faturamento de suas aulas, controle pagamentos recebidos e gerencie despesas de ensino.
           </p>
         </div>
-        <Button
-          onClick={() => setIsDialogOpen(true)}
-          size="lg"
-          className="bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer shadow-md shadow-indigo-600/15"
-        >
-          <Plus className="mr-2 size-4" />
-          Registrar Despesa
-        </Button>
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Valor Hora Base Widget */}
+          <div className="flex items-center gap-2 bg-slate-900/60 border border-slate-800 rounded-xl px-3.5 py-1.5 shadow-md">
+            <DollarSign className="size-4 text-indigo-400" />
+            <span className="text-xs font-semibold text-slate-350">Hora-Aula Base:</span>
+            {isEditingRate ? (
+              <form onSubmit={handleRateSubmit} className="flex items-center gap-1.5">
+                <div className="relative">
+                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-500 text-[10px] font-bold">R$</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={rateInput}
+                    onChange={(e) => setRateInput(e.target.value)}
+                    className="w-20 h-7 bg-slate-950 border border-slate-700 rounded-md text-xs pl-6 pr-1.5 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 outline-none text-white font-mono"
+                    autoFocus
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={isUpdatingRate}
+                  className="p-1.5 rounded-md hover:bg-green-500/10 text-green-400 hover:text-green-300 transition-colors cursor-pointer disabled:opacity-50"
+                  title="Salvar"
+                >
+                  {isUpdatingRate ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Check className="size-3.5" />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsEditingRate(false)}
+                  className="p-1.5 rounded-md hover:bg-red-500/10 text-red-400 hover:text-red-300 transition-colors cursor-pointer"
+                  title="Cancelar"
+                >
+                  <X className="size-3.5" />
+                </button>
+              </form>
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-white font-mono">
+                  R$ {currentHourlyRate.toFixed(2)}
+                </span>
+                <button
+                  onClick={() => {
+                    setRateInput(currentHourlyRate.toString())
+                    setIsEditingRate(true)
+                  }}
+                  className="p-1 rounded-md hover:bg-indigo-500/15 text-indigo-400 hover:text-indigo-300 transition-all cursor-pointer"
+                  title="Editar valor hora-aula base"
+                >
+                  <Edit3 className="size-3.5" />
+                </button>
+              </div>
+            )}
+          </div>
+
+          <Button
+            onClick={() => setIsDialogOpen(true)}
+            size="lg"
+            className="bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer shadow-md shadow-indigo-600/15"
+          >
+            <Plus className="mr-2 size-4" />
+            Registrar Despesa
+          </Button>
+        </div>
       </div>
 
       {/* Main Tabs (Balanço do Mês / Balanço Geral) */}
@@ -178,6 +282,7 @@ export function FinanceiroClient({
           Balanço Geral
         </button>
       </div>
+
 
       {/* Condicional do Balanço do Mês: exibe cards, seletor de mês e sub-abas */}
       {tab === 'mensal' && (
@@ -280,7 +385,7 @@ export function FinanceiroClient({
                       type="number"
                       step="0.01"
                       placeholder="0,00"
-                      className="bg-slate-955 border-slate-800 text-slate-200"
+                      className="bg-slate-950 border-slate-800 text-slate-200"
                       {...register('amount')}
                     />
                     {errors.amount && (
@@ -295,7 +400,7 @@ export function FinanceiroClient({
                     <Input
                       id="date"
                       type="date"
-                      className="bg-slate-955 border-slate-800 text-slate-200"
+                      className="bg-slate-950 border-slate-800 text-slate-200"
                       {...register('date')}
                     />
                     {errors.date && (
@@ -314,10 +419,10 @@ export function FinanceiroClient({
                     className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-200 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
                     {...register('category')}
                   >
-                    <option value="MATERIAL">Material Didático</option>
-                    <option value="TRANSPORTE">Locomoção / Transporte</option>
-                    <option value="SOFTWARE">Softwares / Ferramentas</option>
-                    <option value="OUTRO">Outros</option>
+                    <option value="MATERIAL" className="bg-slate-900 text-slate-200">Material Didático</option>
+                    <option value="TRANSPORTE" className="bg-slate-900 text-slate-200">Locomoção / Transporte</option>
+                    <option value="SOFTWARE" className="bg-slate-900 text-slate-200">Softwares / Ferramentas</option>
+                    <option value="OUTRO" className="bg-slate-900 text-slate-200">Outros</option>
                   </select>
                 </div>
 

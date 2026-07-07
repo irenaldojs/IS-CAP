@@ -10,7 +10,10 @@ import {
   deleteLesson,
   createRecurringSchedule,
   updateRecurringSchedule,
-  deleteRecurringSchedule
+  deleteRecurringSchedule,
+  checkLessonOverlap,
+  checkRecurringScheduleOverlap,
+  checkRecurringScheduleUpdateOverlap
 } from '@/actions/lessons'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -19,13 +22,26 @@ import { toast } from 'sonner'
 import { X, Loader2, Calendar, Clock, DollarSign, BookOpen, User, Video, MapPin, Trash2, Repeat, Gift } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
+// Helper functions to convert between float hours and HH:MM string
+function floatToTime(duration: number): string {
+  const hours = Math.floor(duration);
+  const minutes = Math.round((duration - hours) * 60);
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
+function timeToFloat(timeStr: string): number {
+  if (!timeStr) return 0;
+  const [h, m] = timeStr.split(':').map(Number);
+  return h + (m / 60);
+}
+
 // Zod Form Validation
 const lessonFormSchema = z.object({
   studentId: z.string().min(1, 'Selecione um aluno'),
   subjectId: z.string().optional(),
   date: z.string().min(1, 'Selecione uma data'),
   time: z.string().min(1, 'Selecione o horário de início'),
-  durationHours: z.coerce.number().min(0.1, 'Mínimo de 0.1 hora').max(24, 'Máximo de 24 horas'),
+  durationTime: z.string().min(1, 'Selecione a duração'),
   value: z.coerce.number().min(0, 'Valor não pode ser negativo'),
   modality: z.string().min(1, 'Selecione a modalidade'),
   status: z.string().optional(),
@@ -103,7 +119,7 @@ export function LessonDialog({
       subjectId: '',
       date: '',
       time: '',
-      durationHours: 1.5,
+      durationTime: '01:30',
       value: 80,
       modality: 'ONLINE',
       status: 'AGENDADA',
@@ -114,17 +130,18 @@ export function LessonDialog({
 
   // Assistir mudanças de aluno e duração para auto-preenchimento
   const watchedStudentId = watch('studentId')
-  const watchedDurationHours = watch('durationHours')
+  const watchedDurationTime = watch('durationTime')
 
   const selectedStudent = students.find(s => s.id === watchedStudentId)
 
   // Auto-preenche o preço quando aluno ou duração mudar
   useEffect(() => {
-    if (watchedStudentId && watchedDurationHours) {
+    if (watchedStudentId && watchedDurationTime) {
       const studentRate = selectedStudent?.hourlyRate ?? defaultHourlyRate
-      setValue('value', Number((watchedDurationHours * studentRate).toFixed(2)))
+      const durationHours = timeToFloat(watchedDurationTime)
+      setValue('value', Number((durationHours * studentRate).toFixed(2)))
     }
-  }, [watchedStudentId, watchedDurationHours, selectedStudent, defaultHourlyRate, setValue])
+  }, [watchedStudentId, watchedDurationTime, selectedStudent, defaultHourlyRate, setValue])
 
   // Popula formulário se estiver em modo de edição
   useEffect(() => {
@@ -144,7 +161,7 @@ export function LessonDialog({
         subjectId: editingLesson.subjectId,
         date: dateString,
         time: timeString,
-        durationHours: editingLesson.durationHours,
+        durationTime: floatToTime(editingLesson.durationHours),
         value: editingLesson.value,
         modality: editingLesson.modality,
         status: editingLesson.status,
@@ -160,7 +177,7 @@ export function LessonDialog({
         subjectId: '',
         date: new Date().toISOString().split('T')[0],
         time: '14:00',
-        durationHours: 1.5,
+        durationTime: '01:30',
         value: defaultHourlyRate * 1.5,
         modality: 'ONLINE',
         status: 'AGENDADA',
@@ -196,15 +213,47 @@ export function LessonDialog({
           const dayOfWeek = firstDate.getDay()
           const timeString = firstDate.toTimeString().split(' ')[0].substring(0, 5) // HH:MM
 
+          // Verificar colisão
+          const durationHours = timeToFloat(values.durationTime)
+          const check = await checkRecurringScheduleUpdateOverlap(editingLesson.recurringScheduleId, {
+            dayOfWeek,
+            startTime: timeString,
+            durationHours: durationHours,
+          })
+          if (check.hasOverlap) {
+            const conflictNames = Array.from(new Set(check.overlaps.map(o => o.studentName))).join(', ')
+            const confirmMsg = `Conflito de Horários:\nNas datas futuras selecionadas, já existem aulas agendadas com os seguintes alunos: ${conflictNames}.\n\nDeseja salvar mesmo assim para dar aulas conjuntas (criar combo)?`
+            if (!confirm(confirmMsg)) {
+              setIsSubmitting(false)
+              return
+            }
+          }
+
           await updateRecurringSchedule(editingLesson.recurringScheduleId, {
             dayOfWeek,
             startTime: timeString,
-            durationHours: values.durationHours,
+            durationHours: durationHours,
             value: values.value,
             modality: values.modality,
           })
           toast.success('Série de aulas recorrentes atualizada com sucesso!')
         } else {
+          // Verificar colisão
+          const durationHours = timeToFloat(values.durationTime)
+          const check = await checkLessonOverlap({
+            startTime: combinedDateTime,
+            durationHours: durationHours,
+            ignoreLessonId: editingLesson.id,
+          })
+          if (check.hasOverlap) {
+            const conflictNames = check.overlappingLessons.map(l => l.studentName).join(', ')
+            const confirmMsg = `Conflito de Horário:\nJá existe aula agendada com (${conflictNames}) nesse horário.\n\nDeseja salvar mesmo assim para dar aula conjunta (combo)?`
+            if (!confirm(confirmMsg)) {
+              setIsSubmitting(false)
+              return
+            }
+          }
+
           // Atualiza apenas a instância selecionada
           const lessonInput = {
             studentId: values.studentId,
@@ -212,7 +261,7 @@ export function LessonDialog({
             subjectIds: selectedSubjects,
             date: combinedDateTime,
             startTime: combinedDateTime,
-            durationHours: values.durationHours,
+            durationHours: durationHours,
             value: values.value,
             modality: values.modality,
             status: values.status,
@@ -225,24 +274,54 @@ export function LessonDialog({
       } else {
         // Novo Agendamento
         if (scheduleType === 'SEMANAL') {
+          // Verificar colisão
+          const durationHours = timeToFloat(values.durationTime)
+          const check = await checkRecurringScheduleOverlap({
+            startDate: combinedDateTime,
+            durationHours: durationHours,
+          })
+          if (check.hasOverlap) {
+            const conflictNames = Array.from(new Set(check.overlaps.map(o => o.studentName))).join(', ')
+            const confirmMsg = `Conflito de Horários:\nNas datas deste agendamento, já existem aulas com os seguintes alunos: ${conflictNames}.\n\nDeseja salvar mesmo assim para criar aulas conjuntas (combo)?`
+            if (!confirm(confirmMsg)) {
+              setIsSubmitting(false)
+              return
+            }
+          }
+
           await createRecurringSchedule({
             studentId: values.studentId,
             subjectId: selectedSubjects[0],
             startDate: combinedDateTime,
-            durationHours: values.durationHours,
+            durationHours: durationHours,
             value: values.value,
             modality: values.modality,
             notes: values.notes,
           })
           toast.success('Agendamento semanal e aulas das próximas 8 semanas gerados!')
         } else {
+          // Verificar colisão
+          const durationHours = timeToFloat(values.durationTime)
+          const check = await checkLessonOverlap({
+            startTime: combinedDateTime,
+            durationHours: durationHours,
+          })
+          if (check.hasOverlap) {
+            const conflictNames = check.overlappingLessons.map(l => l.studentName).join(', ')
+            const confirmMsg = `Conflito de Horário:\nJá existe aula agendada com (${conflictNames}) nesse horário.\n\nDeseja salvar mesmo assim para dar aula conjunta (combo)?`
+            if (!confirm(confirmMsg)) {
+              setIsSubmitting(false)
+              return
+            }
+          }
+
           const lessonInput = {
             studentId: values.studentId,
             subjectId: selectedSubjects[0],
             subjectIds: selectedSubjects,
             date: combinedDateTime,
             startTime: combinedDateTime,
-            durationHours: values.durationHours,
+            durationHours: durationHours,
             value: values.value,
             modality: values.modality,
             status: values.status,
@@ -399,9 +478,9 @@ export function LessonDialog({
                 className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all disabled:opacity-50"
                 {...register('studentId')}
               >
-                <option value="">Selecione o aluno...</option>
+                <option value="" className="bg-slate-900 text-slate-200">Selecione o aluno...</option>
                 {students.map((student) => (
-                  <option key={student.id} value={student.id}>
+                  <option key={student.id} value={student.id} className="bg-slate-900 text-slate-200">
                     {student.name}
                   </option>
                 ))}
@@ -480,18 +559,17 @@ export function LessonDialog({
             {/* Duration & Value Grid */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <Label htmlFor="durationHours" className="text-slate-300 text-xs font-semibold flex items-center gap-1.5">
-                  <Clock className="size-3.5 text-indigo-400" /> Duração (horas) <span className="text-red-500">*</span>
+                <Label htmlFor="durationTime" className="text-slate-300 text-xs font-semibold flex items-center gap-1.5">
+                  <Clock className="size-3.5 text-indigo-400" /> Duração <span className="text-red-500">*</span>
                 </Label>
                 <Input
-                  id="durationHours"
-                  type="number"
-                  step="any"
+                  id="durationTime"
+                  type="time"
                   className="bg-slate-950 border-slate-800 text-slate-200 focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20"
-                  {...register('durationHours')}
+                  {...register('durationTime')}
                 />
-                {errors.durationHours && (
-                  <p className="text-xs text-red-400 mt-1">{errors.durationHours.message}</p>
+                {errors.durationTime && (
+                  <p className="text-xs text-red-400 mt-1">{errors.durationTime.message}</p>
                 )}
               </div>
 
@@ -531,11 +609,11 @@ export function LessonDialog({
                 </Label>
                 <select
                   id="modality"
-                  className="w-full rounded-lg border border-slate-800 bg-slate-955 px-3 py-2 text-sm text-slate-200 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                  className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
                   {...register('modality')}
                 >
-                  <option value="ONLINE">Online (Vídeo)</option>
-                  <option value="PRESENCIAL">Presencial</option>
+                  <option value="ONLINE" className="bg-slate-900 text-slate-200">Online (Vídeo)</option>
+                  <option value="PRESENCIAL" className="bg-slate-900 text-slate-200">Presencial</option>
                 </select>
                 {errors.modality && (
                   <p className="text-xs text-red-400 mt-1">{errors.modality.message}</p>
@@ -552,9 +630,9 @@ export function LessonDialog({
                   className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all disabled:opacity-50"
                   {...register('status')}
                 >
-                  <option value="AGENDADA">Agendada</option>
-                  <option value="CONCLUIDA">Concluída</option>
-                  <option value="CANCELADA">Cancelada</option>
+                  <option value="AGENDADA" className="bg-slate-900 text-slate-200">Agendada</option>
+                  <option value="CONCLUIDA" className="bg-slate-900 text-slate-200">Concluída</option>
+                  <option value="CANCELADA" className="bg-slate-900 text-slate-200">Cancelada</option>
                 </select>
               </div>
             </div>
@@ -575,7 +653,7 @@ export function LessonDialog({
           </div>
 
           {/* Footer Actions */}
-          <div className="flex items-center justify-between border-t border-slate-800 bg-slate-955/40 px-6 py-4">
+          <div className="flex items-center justify-between border-t border-slate-800 bg-slate-950/40 px-6 py-4">
             <div>
               {editingLesson && (
                 <Button

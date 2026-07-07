@@ -5,6 +5,7 @@ import { FinanceSummaryCards } from './finance-summary-cards'
 import { FinanceDataView } from './finance-data-view'
 import { FinanceSummarySkeleton, FinanceTableSkeleton } from './finance-skeletons'
 import { Suspense } from 'react'
+import prisma from '@/lib/prisma'
 
 interface PageProps {
   searchParams: Promise<{
@@ -32,6 +33,13 @@ export default async function FinanceiroPage({ searchParams }: PageProps) {
   const month = resolvedParams.month ? parseInt(resolvedParams.month) : currentMonth
   const year = resolvedParams.year ? parseInt(resolvedParams.year) : currentYear
 
+  // Busca o valor base da hora de aula do perfil do usuário
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { defaultHourlyRate: true },
+  })
+  const defaultHourlyRate = user?.defaultHourlyRate || 80
+
   const showSummaryCards = tab === 'mensal'
   const summaryKey = `summary-mensal-${month}-${year}`
 
@@ -41,6 +49,7 @@ export default async function FinanceiroPage({ searchParams }: PageProps) {
       subTab={subTab}
       month={month}
       year={year}
+      defaultHourlyRate={defaultHourlyRate}
       summaryCards={
         showSummaryCards ? (
           <Suspense key={summaryKey} fallback={<FinanceSummarySkeleton />}>
@@ -55,3 +64,4 @@ export default async function FinanceiroPage({ searchParams }: PageProps) {
     </FinanceiroClient>
   )
 }
+

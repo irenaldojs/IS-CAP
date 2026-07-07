@@ -17,6 +17,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: 'IS-CAP — Controle de Aulas Particulares',
   description: 'Sistema completo para gestão de alunos, agenda, finanças e materiais didáticos.',
+  icons: {
+    icon: '/icon.svg',
+  },
 }
 
 export default function RootLayout({

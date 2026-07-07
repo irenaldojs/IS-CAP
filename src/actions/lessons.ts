@@ -515,3 +515,204 @@ export async function getRecurringSchedules() {
     },
   })
 }
+
+// 11. Verificar se há colisão/sobreposição de horários para uma aula avulsa/instância
+export async function checkLessonOverlap(data: {
+  startTime: Date | string
+  durationHours: number
+  ignoreLessonId?: string
+}) {
+  const session = await auth()
+  if (!session?.user?.id) throw new Error('Não autorizado')
+
+  const start = new Date(data.startTime)
+  const durationMs = Number(data.durationHours) * 60 * 60 * 1000
+  const end = new Date(start.getTime() + durationMs)
+
+  const startOfDay = new Date(start)
+  startOfDay.setHours(0, 0, 0, 0)
+  const endOfDay = new Date(start)
+  endOfDay.setHours(23, 59, 59, 999)
+
+  const lessons = await prisma.lesson.findMany({
+    where: {
+      userId: session.user.id,
+      status: { not: 'CANCELADA' },
+      id: data.ignoreLessonId ? { not: data.ignoreLessonId } : undefined,
+      date: {
+        gte: startOfDay,
+        lte: endOfDay,
+      },
+    },
+    include: {
+      student: {
+        select: { name: true }
+      }
+    }
+  })
+
+  const overlappingLessons = lessons.filter(lesson => {
+    const lStart = new Date(lesson.startTime)
+    const lEnd = new Date(lStart.getTime() + lesson.durationHours * 60 * 60 * 1000)
+    return start < lEnd && end > lStart
+  })
+
+  return {
+    hasOverlap: overlappingLessons.length > 0,
+    overlappingLessons: overlappingLessons.map(l => ({
+      id: l.id,
+      studentName: l.student.name,
+      startTime: l.startTime,
+      durationHours: l.durationHours,
+    }))
+  }
+}
+
+// 12. Verificar se há colisão ao criar um novo agendamento recorrente (8 semanas)
+export async function checkRecurringScheduleOverlap(data: {
+  startDate: Date | string
+  durationHours: number
+}) {
+  const session = await auth()
+  if (!session?.user?.id) throw new Error('Não autorizado')
+
+  const firstDate = new Date(data.startDate)
+  const durationMs = Number(data.durationHours) * 60 * 60 * 1000
+
+  const dates = []
+  const current = new Date(firstDate)
+  for (let i = 0; i < 8; i++) {
+    dates.push(new Date(current))
+    current.setDate(current.getDate() + 7)
+  }
+
+  const overlaps: Array<{ date: string; studentName: string }> = []
+
+  for (const lessonDate of dates) {
+    const startOfDay = new Date(lessonDate)
+    startOfDay.setHours(0, 0, 0, 0)
+    const endOfDay = new Date(lessonDate)
+    endOfDay.setHours(23, 59, 59, 999)
+
+    const lessons = await prisma.lesson.findMany({
+      where: {
+        userId: session.user.id,
+        status: { not: 'CANCELADA' },
+        date: {
+          gte: startOfDay,
+          lte: endOfDay,
+        },
+      },
+      include: {
+        student: {
+          select: { name: true }
+        }
+      }
+    })
+
+    const lessonStart = new Date(lessonDate)
+    const lessonEnd = new Date(lessonStart.getTime() + durationMs)
+
+    const dayOverlaps = lessons.filter(l => {
+      const lStart = new Date(l.startTime)
+      const lEnd = new Date(lStart.getTime() + l.durationHours * 60 * 60 * 1000)
+      return lessonStart < lEnd && lessonEnd > lStart
+    })
+
+    for (const ol of dayOverlaps) {
+      overlaps.push({
+        date: lessonDate.toLocaleDateString('pt-BR'),
+        studentName: ol.student.name,
+      })
+    }
+  }
+
+  return {
+    hasOverlap: overlaps.length > 0,
+    overlaps,
+  }
+}
+
+// 13. Verificar colisão ao atualizar recorrência existente
+export async function checkRecurringScheduleUpdateOverlap(
+  id: string,
+  data: {
+    dayOfWeek: number
+    startTime: string
+    durationHours: number
+  }
+) {
+  const session = await auth()
+  if (!session?.user?.id) throw new Error('Não autorizado')
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const futureLessons = await prisma.lesson.findMany({
+    where: {
+      recurringScheduleId: id,
+      status: 'AGENDADA',
+      date: { gte: today },
+    },
+    orderBy: { date: 'asc' },
+  })
+
+  const overlaps: Array<{ date: string; studentName: string }> = []
+  const durationMs = Number(data.durationHours) * 60 * 60 * 1000
+
+  for (const lesson of futureLessons) {
+    const lessonDate = new Date(lesson.date)
+    const currentDay = lessonDate.getDay()
+    const daysToAdd = (data.dayOfWeek - currentDay + 7) % 7
+    if (daysToAdd !== 0) {
+      lessonDate.setDate(lessonDate.getDate() + daysToAdd)
+    }
+
+    const [hours, minutes] = data.startTime.split(':').map(Number)
+    const newStartTime = new Date(lessonDate)
+    newStartTime.setHours(hours, minutes, 0, 0)
+    const newEndTime = new Date(newStartTime.getTime() + durationMs)
+
+    const startOfDay = new Date(lessonDate)
+    startOfDay.setHours(0, 0, 0, 0)
+    const endOfDay = new Date(lessonDate)
+    endOfDay.setHours(23, 59, 59, 999)
+
+    const otherLessons = await prisma.lesson.findMany({
+      where: {
+        userId: session.user.id,
+        status: { not: 'CANCELADA' },
+        recurringScheduleId: { not: id },
+        id: { not: lesson.id },
+        date: {
+          gte: startOfDay,
+          lte: endOfDay,
+        },
+      },
+      include: {
+        student: {
+          select: { name: true }
+        }
+      }
+    })
+
+    const dayOverlaps = otherLessons.filter(ol => {
+      const olStart = new Date(ol.startTime)
+      const olEnd = new Date(olStart.getTime() + ol.durationHours * 60 * 60 * 1000)
+      return newStartTime < olEnd && newEndTime > olStart
+    })
+
+    for (const ol of dayOverlaps) {
+      overlaps.push({
+        date: lessonDate.toLocaleDateString('pt-BR'),
+        studentName: ol.student.name,
+      })
+    }
+  }
+
+  return {
+    hasOverlap: overlaps.length > 0,
+    overlaps,
+  }
+}
+
