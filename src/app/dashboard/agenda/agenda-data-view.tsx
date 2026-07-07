@@ -252,22 +252,6 @@ export async function LessonsDataView({ view, period, date }: LessonsDataViewPro
     return lessonDate >= startOfWeek && lessonDate <= endOfWeek
   })
 
-  // Formatador de datas da semana para o cabeçalho
-  const formatDateRange = () => {
-    const formatDay = (d: Date) => d.getDate()
-    const formatMonth = (d: Date) => d.toLocaleString('pt-BR', { month: 'short' })
-    const formatYear = (d: Date) => d.getFullYear()
-    
-    const sunday = weekDays[6]
-    
-    if (monday.getMonth() === sunday.getMonth()) {
-      return `${formatDay(monday)} a ${formatDay(sunday)} de ${formatMonth(monday)} de ${formatYear(monday)}`
-    } else if (monday.getFullYear() === sunday.getFullYear()) {
-      return `${formatDay(monday)} de ${formatMonth(monday)} a ${formatDay(sunday)} de ${formatMonth(sunday)} de ${formatYear(monday)}`
-    }
-    return `${formatDay(monday)} de ${formatMonth(monday)} de ${formatYear(monday)} a ${formatDay(sunday)} de ${formatMonth(sunday)} de ${formatYear(sunday)}`
-  }
-
   const getLessonsForDay = (day: Date) => {
     return weekLessons.filter((lesson) => {
       const d = getTzDate(lesson.date)
@@ -278,15 +262,6 @@ export async function LessonsDataView({ view, period, date }: LessonsDataViewPro
       )
     })
   }
-
-  const getNeighborWeekDate = (pivotDate: Date, direction: number) => {
-    const newDate = new Date(pivotDate)
-    newDate.setDate(newDate.getDate() + direction * 7)
-    return newDate.toISOString().split('T')[0]
-  }
-
-  const prevWeekDateStr = getNeighborWeekDate(selectedDate, -1)
-  const nextWeekDateStr = getNeighborWeekDate(selectedDate, 1)
 
   // Estatísticas da semana
   const totalDuration = weekLessons.reduce((acc, l) => acc + l.durationHours, 0)
@@ -314,11 +289,8 @@ export async function LessonsDataView({ view, period, date }: LessonsDataViewPro
     <div className="flex flex-col h-full min-h-0 space-y-3 overflow-hidden">
       {/* Informações da Semana Selecionada */}
       <AgendaHeader
-        prevWeekDateStr={prevWeekDateStr}
-        nextWeekDateStr={nextWeekDateStr}
         date={date}
         view={view}
-        dateRangeStr={formatDateRange()}
         lessonsCountSpan={
           <span className="text-xs font-bold text-white mt-0.5 block">{weekLessons.length} Aulas</span>
         }
