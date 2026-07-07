@@ -66,7 +66,7 @@ export default function Sidebar() {
               key={item.href}
               href={item.href}
               className={cn(
-                "group relative flex size-12 items-center justify-center rounded-xl transition-all duration-200",
+                "group relative flex size-12 items-center justify-center rounded-xl transition-all duration-200 border-none",
                 isActive
                   ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-md scale-105"
                   : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
