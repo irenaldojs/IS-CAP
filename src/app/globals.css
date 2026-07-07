@@ -148,4 +148,16 @@
   html {
     @apply font-sans;
   }
+  
+  /* Lock parent scroll when page layout handles its own scrolling (e.g. students list) */
+  main:has(.alunos-page-container) {
+    overflow: hidden !important;
+  }
+  main:has(.alunos-page-container) > div {
+    height: 100% !important;
+    max-height: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+  }
 }

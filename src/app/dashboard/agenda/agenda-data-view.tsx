@@ -103,18 +103,18 @@ export async function LessonsDataView({ view, period, date }: LessonsDataViewPro
   // --- Lógica de Visualização em Lista ---
   if (view === 'list') {
     return (
-      <Card className="border-slate-800 bg-slate-900/20 backdrop-blur-md">
-        <CardHeader className="py-4">
-          <CardTitle className="text-base font-semibold text-slate-200">
+      <Card className="border-slate-800 bg-slate-900/20 backdrop-blur-md flex flex-col h-full overflow-hidden">
+        <CardHeader className="px-6 py-1.5 shrink-0 flex flex-row items-center justify-between space-y-0 border-b border-slate-800 bg-slate-950/20">
+          <CardTitle className="text-xs font-bold text-slate-200 uppercase tracking-wider">
             {period === 'today' ? 'Aulas de Hoje' : 'Próximas Aulas (Próximos 7 dias)'}
           </CardTitle>
-          <CardDescription className="text-slate-400 text-xs">
+          <CardDescription className="text-slate-400 text-[10px]">
             {displayLessons.length === 1
               ? '1 aula encontrada'
               : `${displayLessons.length} aulas encontradas`}
           </CardDescription>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent className="p-0 flex-1 overflow-y-auto min-h-0 scrollbar-thin scrollbar-thumb-slate-800/80">
           {displayLessons.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
               <CalendarIcon className="size-12 text-slate-700 mb-3" />
@@ -129,14 +129,14 @@ export async function LessonsDataView({ view, period, date }: LessonsDataViewPro
             <Table>
               <TableHeader className="bg-slate-950/40 border-b border-slate-800">
                 <TableRow className="border-slate-800">
-                  <TableHead className="pl-6 py-3 text-slate-400 font-medium">Data</TableHead>
-                  <TableHead className="py-3 text-slate-400 font-medium">Horário / Duração</TableHead>
-                  <TableHead className="py-3 text-slate-400 font-medium">Aluno</TableHead>
-                  <TableHead className="py-3 text-slate-400 font-medium">Matéria</TableHead>
-                  <TableHead className="py-3 text-slate-400 font-medium">Modalidade</TableHead>
-                  <TableHead className="py-3 text-slate-400 font-medium">Valor</TableHead>
-                  <TableHead className="py-3 text-slate-400 font-medium">Status</TableHead>
-                  <TableHead className="pr-6 py-3 text-right text-slate-400 font-medium">Ações</TableHead>
+                  <TableHead className="pl-6 py-2.5 text-slate-400 font-medium">Data</TableHead>
+                  <TableHead className="py-2.5 text-slate-400 font-medium">Horário / Duração</TableHead>
+                  <TableHead className="py-2.5 text-slate-400 font-medium">Aluno</TableHead>
+                  <TableHead className="py-2.5 text-slate-400 font-medium">Matéria</TableHead>
+                  <TableHead className="py-2.5 text-slate-400 font-medium">Modalidade</TableHead>
+                  <TableHead className="py-2.5 text-slate-400 font-medium">Valor</TableHead>
+                  <TableHead className="py-2.5 text-slate-400 font-medium">Status</TableHead>
+                  <TableHead className="pr-6 py-2.5 text-right text-slate-400 font-medium">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -146,12 +146,12 @@ export async function LessonsDataView({ view, period, date }: LessonsDataViewPro
                     className="border-slate-800 hover:bg-slate-900/30 transition-colors"
                   >
                     {/* Data */}
-                    <TableCell className="pl-6 py-4 text-slate-200 font-medium whitespace-nowrap">
+                    <TableCell className="pl-6 py-2.5 text-slate-200 font-medium whitespace-nowrap">
                       {formatDate(lesson.date)}
                     </TableCell>
 
                     {/* Horário / Duração */}
-                    <TableCell className="py-4 text-slate-300 whitespace-nowrap">
+                    <TableCell className="py-2.5 text-slate-300 whitespace-nowrap">
                       <div className="flex items-center gap-1.5">
                         <Clock className="size-3.5 text-slate-500" />
                         <span>{formatTime(lesson.startTime)} ({lesson.durationHours}h)</span>
@@ -159,7 +159,7 @@ export async function LessonsDataView({ view, period, date }: LessonsDataViewPro
                     </TableCell>
 
                     {/* Aluno */}
-                    <TableCell className="py-4 text-slate-200 font-medium">
+                    <TableCell className="py-2.5 text-slate-200 font-medium">
                       <div className="flex items-center gap-2">
                         <div className="size-7 rounded bg-indigo-950/40 text-indigo-400 border border-indigo-900/50 flex items-center justify-center font-bold text-xs uppercase">
                           {lesson.student.name.substring(0, 2)}
@@ -169,7 +169,7 @@ export async function LessonsDataView({ view, period, date }: LessonsDataViewPro
                     </TableCell>
 
                     {/* Matéria */}
-                    <TableCell className="py-4">
+                    <TableCell className="py-2.5">
                       <span
                         style={{ color: lesson.subject.color }}
                         className="font-semibold text-sm"
@@ -179,7 +179,7 @@ export async function LessonsDataView({ view, period, date }: LessonsDataViewPro
                     </TableCell>
 
                     {/* Modalidade */}
-                    <TableCell className="py-4 text-slate-300">
+                    <TableCell className="py-2.5 text-slate-300">
                       {lesson.modality === 'ONLINE' ? (
                         <span className="inline-flex items-center gap-1 text-sky-400">
                           <Video className="size-3.5" />
@@ -194,12 +194,12 @@ export async function LessonsDataView({ view, period, date }: LessonsDataViewPro
                     </TableCell>
 
                     {/* Valor */}
-                    <TableCell className="py-4 text-slate-200 font-mono text-sm">
+                    <TableCell className="py-2.5 text-slate-200 font-mono text-sm">
                       {formatCurrency(lesson.value)}
                     </TableCell>
 
                     {/* Status */}
-                    <TableCell className="py-4">
+                    <TableCell className="py-2.5">
                       {lesson.status === 'CONCLUIDA' ? (
                         <span className="inline-flex items-center rounded-full bg-emerald-950/40 px-2.5 py-0.5 text-xs font-semibold text-emerald-450 border border-emerald-900/20">
                           Concluída
@@ -216,11 +216,11 @@ export async function LessonsDataView({ view, period, date }: LessonsDataViewPro
                     </TableCell>
 
                     {/* Ações Rápidas */}
-                    <TableCell className="pr-6 py-4 text-right">
+                    <TableCell className="pr-6 py-2.5 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <Link
                           href={`/dashboard/agenda?view=list&period=${period}&date=${date}&editLessonId=${lesson.id}`}
-                          className="text-xs text-slate-400 hover:text-white px-2 py-1.5 rounded bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer"
+                          className="text-xs text-slate-400 hover:text-white px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer"
                         >
                           Detalhes
                         </Link>
@@ -310,9 +310,9 @@ export async function LessonsDataView({ view, period, date }: LessonsDataViewPro
   }
 
   return (
-    <div className="space-y-3">
+    <div className="flex flex-col h-full min-h-0 space-y-3 overflow-hidden">
       {/* Informações da Semana Selecionada */}
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between bg-slate-900/30 p-2.5 rounded-lg border border-slate-800/80 backdrop-blur-md">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between bg-slate-900/30 p-2.5 rounded-lg border border-slate-800/80 backdrop-blur-md shrink-0">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1 border border-slate-800 bg-slate-950 p-1 rounded-lg">
             <Link
@@ -356,12 +356,12 @@ export async function LessonsDataView({ view, period, date }: LessonsDataViewPro
       </div>
 
       {/* Calendário Semanal Grid */}
-      <div className="relative flex border border-slate-800 bg-slate-900/10 rounded-xl overflow-x-auto scrollbar-thin scrollbar-thumb-slate-800/80">
+      <div className="relative flex border border-slate-800 bg-slate-900/10 rounded-xl flex-1 min-h-0 overflow-auto scrollbar-thin scrollbar-thumb-slate-800/80">
         
         {/* Coluna de Horas */}
         <div className="w-12 flex-shrink-0 border-r border-slate-800 bg-slate-950/60 text-right pr-2 text-[9px] font-semibold text-slate-500 select-none">
           {/* Cabeçalho Vazio para alinhar */}
-          <div className="h-10 border-b border-slate-800" />
+          <div className="h-10 border-b border-slate-800 sticky top-0 bg-slate-950/85 z-30" />
           {/* Linhas de Horas */}
           {hoursArray.map((hour) => (
             <div key={hour} style={{ height: `${hourHeight}px` }} className="flex items-start justify-end pt-1">
@@ -382,8 +382,8 @@ export async function LessonsDataView({ view, period, date }: LessonsDataViewPro
                 {/* Cabeçalho do Dia */}
                 <div
                   className={cn(
-                    "h-10 flex flex-col items-center justify-center border-b border-slate-800 transition-colors bg-slate-950/20",
-                    isToday && "bg-indigo-950/20 text-indigo-400 border-b-2 border-b-indigo-500 font-bold"
+                    "h-10 flex flex-col items-center justify-center border-b border-slate-800 transition-colors bg-slate-950/90 backdrop-blur-sm sticky top-0 z-30",
+                    isToday && "bg-indigo-950/80 text-indigo-400 border-b-2 border-b-indigo-500 font-bold"
                   )}
                 >
                   <span className="text-[9px] uppercase font-bold text-slate-500 tracking-wider leading-none">

@@ -38,12 +38,12 @@ export async function AlunosTable({ query }: AlunosTableProps) {
     <Table>
       <TableHeader className="bg-slate-950/40 border-b border-slate-800">
         <TableRow className="border-slate-800">
-          <TableHead className="pl-6 py-3.5 text-slate-400 font-medium">Nome</TableHead>
-          <TableHead className="py-3.5 text-slate-400 font-medium">Série</TableHead>
-          <TableHead className="py-3.5 text-slate-400 font-medium">Escola</TableHead>
-          <TableHead className="py-3.5 text-slate-400 font-medium">Telefone dos Pais</TableHead>
-          <TableHead className="py-3.5 text-slate-400 font-medium">Status</TableHead>
-          <TableHead className="pr-6 py-3.5 text-right text-slate-400 font-medium">Ações</TableHead>
+          <TableHead className="pl-6 py-2.5 text-slate-400 font-medium">Nome</TableHead>
+          <TableHead className="py-2.5 text-slate-400 font-medium">Série</TableHead>
+          <TableHead className="py-2.5 text-slate-400 font-medium">Escola</TableHead>
+          <TableHead className="py-2.5 text-slate-400 font-medium">Telefone dos Pais</TableHead>
+          <TableHead className="py-2.5 text-slate-400 font-medium">Status</TableHead>
+          <TableHead className="pr-6 py-2.5 text-right text-slate-400 font-medium">Ações</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -53,7 +53,7 @@ export async function AlunosTable({ query }: AlunosTableProps) {
             className="border-slate-800 hover:bg-slate-900/40 transition-colors"
           >
             {/* Nome do Aluno */}
-            <TableCell className="pl-6 py-4 font-medium text-slate-200">
+            <TableCell className="pl-6 py-2 font-medium text-slate-200">
               <div className="flex items-center gap-3">
                 <div className="flex size-9 items-center justify-center rounded-lg bg-indigo-950/50 text-indigo-400 border border-indigo-900/50">
                   <User className="size-4.5" />
@@ -68,7 +68,7 @@ export async function AlunosTable({ query }: AlunosTableProps) {
             </TableCell>
 
             {/* Série/Ano */}
-            <TableCell className="py-4 text-slate-300">
+            <TableCell className="py-2 text-slate-300">
               {student.gradeLevel ? (
                 <div className="flex items-center gap-1.5">
                   <GraduationCap className="size-4 text-slate-400" />
@@ -80,7 +80,7 @@ export async function AlunosTable({ query }: AlunosTableProps) {
             </TableCell>
 
             {/* Escola */}
-            <TableCell className="py-4 text-slate-300">
+            <TableCell className="py-2 text-slate-300">
               {student.school ? (
                 <div className="flex items-center gap-1.5">
                   <School className="size-4 text-slate-400" />
@@ -92,7 +92,7 @@ export async function AlunosTable({ query }: AlunosTableProps) {
             </TableCell>
 
             {/* Telefone dos Pais */}
-            <TableCell className="py-4 text-slate-300 font-mono text-sm">
+            <TableCell className="py-2 text-slate-300 font-mono text-sm">
               {student.parentPhone ? (
                 <div className="flex items-center gap-1.5">
                   <Phone className="size-4 text-slate-400" />
@@ -104,7 +104,7 @@ export async function AlunosTable({ query }: AlunosTableProps) {
             </TableCell>
 
             {/* Status */}
-            <TableCell className="py-4">
+            <TableCell className="py-2">
               {student.active ? (
                 <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-950/50 px-2.5 py-0.5 text-xs font-medium text-emerald-400 border border-emerald-900/30">
                   <span className="relative flex size-1.5">
@@ -122,7 +122,7 @@ export async function AlunosTable({ query }: AlunosTableProps) {
             </TableCell>
 
             {/* Ações */}
-            <TableCell className="pr-6 py-4 text-right">
+            <TableCell className="pr-6 py-2 text-right">
               <div className="flex items-center justify-end gap-2">
                 <Link
                   href={`/dashboard/alunos/${student.id}`}

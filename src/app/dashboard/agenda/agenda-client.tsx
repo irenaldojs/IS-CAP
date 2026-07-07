@@ -53,6 +53,42 @@ export function AgendaClient({
     }
   }, [hasCreateDate])
 
+  // Desabilita o scroll da tag main externa durante a exibição da agenda
+  useEffect(() => {
+    const mainEl = document.querySelector('main')
+    if (mainEl) {
+      const originalOverflow = mainEl.style.overflow
+      const originalHeight = mainEl.style.height
+      mainEl.style.overflow = 'hidden'
+      mainEl.style.height = '100%'
+
+      const wrapperEl = mainEl.firstElementChild as HTMLElement
+      let originalWrapperHeight = ''
+      let originalWrapperDisplay = ''
+      let originalWrapperFlexDir = ''
+
+      if (wrapperEl) {
+        originalWrapperHeight = wrapperEl.style.height
+        originalWrapperDisplay = wrapperEl.style.display
+        originalWrapperFlexDir = wrapperEl.style.flexDirection
+
+        wrapperEl.style.height = '100%'
+        wrapperEl.style.display = 'flex'
+        wrapperEl.style.flexDirection = 'column'
+      }
+
+      return () => {
+        mainEl.style.overflow = originalOverflow
+        mainEl.style.height = originalHeight
+        if (wrapperEl) {
+          wrapperEl.style.height = originalWrapperHeight
+          wrapperEl.style.display = originalWrapperDisplay
+          wrapperEl.style.flexDirection = originalWrapperFlexDir
+        }
+      }
+    }
+  }, [])
+
   const handlePeriodChange = (newPeriod: string) => {
     router.push(`/dashboard/agenda?view=${view}&period=${newPeriod}&date=${date}`)
   }
@@ -69,27 +105,9 @@ export function AgendaClient({
   }
 
   return (
-    <div className="space-y-4">
-      {/* Cabeçalho */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">Agenda de Aulas</h1>
-          <p className="text-slate-400 text-xs mt-0.5">
-            Gerencie seus agendamentos, horários de aulas e status das sessões pedagógicas.
-          </p>
-        </div>
-        <Button
-          onClick={() => setIsDialogOpen(true)}
-          size="sm"
-          className="bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer shadow-md shadow-indigo-600/15 text-xs h-9"
-        >
-          <Plus className="mr-1.5 size-3.5" />
-          Agendar Aula
-        </Button>
-      </div>
-
+    <div className="flex flex-col h-full min-h-0 space-y-4 overflow-hidden">
       {/* Barra de Filtros e Visualização */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-slate-900/40 p-2 rounded-xl border border-slate-800/80 backdrop-blur-md">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-slate-900/40 p-2 rounded-xl border border-slate-800/80 backdrop-blur-md shrink-0">
         
         {/* Abas */}
         <div className="flex gap-1.5 p-1 bg-slate-950/80 rounded-lg border border-slate-800/40 w-full sm:w-auto">
@@ -134,7 +152,9 @@ export function AgendaClient({
       </div>
 
       {/* ÁREA PRINCIPAL: LISTA OU CALENDÁRIO */}
-      {children}
+      <div className="flex-grow min-h-0 flex flex-col">
+        {children}
+      </div>
 
       {/* MODAL DIALOG PARA CRIAR NOVA AULA */}
       <LessonDialog
