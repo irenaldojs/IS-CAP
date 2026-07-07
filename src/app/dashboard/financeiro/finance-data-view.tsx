@@ -4,6 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { TogglePaymentButton } from './toggle-payment-button'
 import { DeleteExpenseButton } from './delete-expense-button'
 import Link from 'next/link'
+import { getTzDate } from '@/lib/date-utils'
 import {
   DollarSign,
   CheckCircle,
@@ -34,13 +35,14 @@ export async function FinanceDataView({ tab, month, year }: FinanceDataViewProps
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
+      timeZone: 'America/Sao_Paulo',
     }).format(new Date(dateInput))
   }
 
   if (tab === 'receitas') {
     const allPayments = await getPayments()
     const payments = allPayments.filter((p) => {
-      const d = new Date(p.lesson.date)
+      const d = getTzDate(p.lesson.date)
       return d.getFullYear() === year && d.getMonth() + 1 === month
     })
 
@@ -251,7 +253,7 @@ export async function FinanceDataView({ tab, month, year }: FinanceDataViewProps
   // Se a aba for despesas
   const allExpenses = await getExpenses()
   const expenses = allExpenses.filter((e) => {
-    const d = new Date(e.date)
+    const d = getTzDate(e.date)
     return d.getFullYear() === year && d.getMonth() + 1 === month
   })
 

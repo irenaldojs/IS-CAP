@@ -21,6 +21,7 @@ import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { X, Loader2, Calendar, Clock, DollarSign, BookOpen, User, Video, MapPin, Trash2, Repeat, Gift } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { getTzDate } from '@/lib/date-utils'
 
 // Helper functions to convert between float hours and HH:MM string
 function floatToTime(duration: number): string {
@@ -146,11 +147,11 @@ export function LessonDialog({
   // Popula formulário se estiver em modo de edição
   useEffect(() => {
     if (editingLesson) {
-      const lessonDate = new Date(editingLesson.date)
-      const dateString = lessonDate.toISOString().split('T')[0]
+      const lessonDate = getTzDate(editingLesson.date)
+      const dateString = lessonDate.getFullYear() + '-' + String(lessonDate.getMonth() + 1).padStart(2, '0') + '-' + String(lessonDate.getDate()).padStart(2, '0')
       
-      const startTime = new Date(editingLesson.startTime)
-      const timeString = startTime.toTimeString().split(' ')[0].substring(0, 5) // HH:MM
+      const startTime = getTzDate(editingLesson.startTime)
+      const timeString = String(startTime.getHours()).padStart(2, '0') + ':' + String(startTime.getMinutes()).padStart(2, '0')
       
       setScheduleType(editingLesson.recurringScheduleId ? 'SEMANAL' : 'AVULSA')
       setEditOption('INSTANCE')
@@ -172,10 +173,14 @@ export function LessonDialog({
       setScheduleType('AVULSA')
       setEditOption('INSTANCE')
       setSelectedSubjects([])
+      
+      const nowTz = getTzDate(new Date())
+      const currentDateString = nowTz.getFullYear() + '-' + String(nowTz.getMonth() + 1).padStart(2, '0') + '-' + String(nowTz.getDate()).padStart(2, '0')
+
       reset({
         studentId: '',
         subjectId: '',
-        date: new Date().toISOString().split('T')[0],
+        date: currentDateString,
         time: '14:00',
         durationTime: '01:30',
         value: defaultHourlyRate * 1.5,

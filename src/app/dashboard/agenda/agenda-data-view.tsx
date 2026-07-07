@@ -15,6 +15,7 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { buttonVariants } from '@/components/ui/button'
 import { DatePickerNav } from './date-picker-nav'
+import { getTzDate } from '@/lib/date-utils'
 
 interface LessonsDataViewProps {
   view: 'list' | 'calendar'
@@ -38,6 +39,7 @@ export async function LessonsDataView({ view, period, date }: LessonsDataViewPro
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
+      timeZone: 'America/Sao_Paulo',
     }).format(new Date(dateInput))
   }
 
@@ -45,11 +47,12 @@ export async function LessonsDataView({ view, period, date }: LessonsDataViewPro
     return new Intl.DateTimeFormat('pt-BR', {
       hour: '2-digit',
       minute: '2-digit',
+      timeZone: 'America/Sao_Paulo',
     }).format(new Date(dateInput))
   }
 
   // --- Lógica de Filtros e Datas ---
-  const selectedDate = new Date(date + 'T12:00:00') // evita problemas de timezone
+  const selectedDate = getTzDate(date + 'T12:00:00') // evita problemas de timezone
   const targetDate = new Date(selectedDate)
   targetDate.setHours(0, 0, 0, 0)
 
@@ -72,7 +75,7 @@ export async function LessonsDataView({ view, period, date }: LessonsDataViewPro
   endOfWeek.setHours(23, 59, 59, 999)
 
   const filteredLessons = lessons.filter((lesson) => {
-    const lessonDate = new Date(lesson.date)
+    const lessonDate = getTzDate(lesson.date)
     lessonDate.setHours(0, 0, 0, 0)
 
     if (period === 'today') {
@@ -269,7 +272,7 @@ export async function LessonsDataView({ view, period, date }: LessonsDataViewPro
 
   const getLessonsForDay = (day: Date) => {
     return weekLessons.filter((lesson) => {
-      const d = new Date(lesson.date)
+      const d = getTzDate(lesson.date)
       return (
         d.getDate() === day.getDate() &&
         d.getMonth() === day.getMonth() &&
@@ -298,7 +301,7 @@ export async function LessonsDataView({ view, period, date }: LessonsDataViewPro
   const hoursArray = Array.from({ length: endHour - startHour + 1 }, (_, i) => startHour + i)
 
   const getPosition = (startTimeStr: Date | string, durationHours: number) => {
-    const startTime = new Date(startTimeStr)
+    const startTime = getTzDate(startTimeStr)
     const hours = startTime.getHours()
     const minutes = startTime.getMinutes()
     
