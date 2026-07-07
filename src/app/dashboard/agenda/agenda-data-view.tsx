@@ -7,15 +7,13 @@ import {
   Video,
   MapPin,
   Clock,
-  ChevronLeft,
-  ChevronRight,
   Repeat,
 } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { buttonVariants } from '@/components/ui/button'
-import { DatePickerNav } from './date-picker-nav'
 import { getTzDate } from '@/lib/date-utils'
+import { AgendaHeader } from './agenda-header'
 
 interface LessonsDataViewProps {
   view: 'list' | 'calendar'
@@ -315,48 +313,22 @@ export async function LessonsDataView({ view, period, date }: LessonsDataViewPro
   return (
     <div className="flex flex-col h-full min-h-0 space-y-3 overflow-hidden">
       {/* Informações da Semana Selecionada */}
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between bg-slate-900/30 p-2.5 rounded-lg border border-slate-800/80 backdrop-blur-md shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1 border border-slate-800 bg-slate-950 p-1 rounded-lg">
-            <Link
-              href={`/dashboard/agenda?view=calendar&date=${prevWeekDateStr}`}
-              className={cn(buttonVariants({ variant: 'outline', size: 'icon-sm' }), "h-7 w-7 cursor-pointer")}
-              title="Semana Anterior"
-            >
-              <ChevronLeft className="size-3.5" />
-            </Link>
-            <Link
-              href={`/dashboard/agenda?view=calendar&date=${nextWeekDateStr}`}
-              className={cn(buttonVariants({ variant: 'outline', size: 'icon-sm' }), "h-7 w-7 cursor-pointer")}
-              title="Próxima Semana"
-            >
-              <ChevronRight className="size-3.5" />
-            </Link>
-          </div>
-          <DatePickerNav currentDate={date} view={view} />
-          <div>
-            <h2 className="text-sm font-bold text-slate-200 capitalize">
-              {formatDateRange()}
-            </h2>
-          </div>
-        </div>
-
-        {/* Resumo Rápido da Semana */}
-        <div className="flex flex-wrap gap-2 text-[10px]">
-          <div className="bg-slate-950/40 px-2 py-1 rounded border border-slate-850">
-            <span className="text-slate-500 block">Aulas Semanais</span>
-            <span className="text-xs font-bold text-white mt-0.5 block">{weekLessons.length} Aulas</span>
-          </div>
-          <div className="bg-slate-950/40 px-2 py-1 rounded border border-slate-850">
-            <span className="text-slate-500 block">Horas Totais</span>
-            <span className="text-xs font-bold text-indigo-400 mt-0.5 block">{totalDuration} Horas</span>
-          </div>
-          <div className="bg-slate-950/40 px-2 py-1 rounded border border-slate-850">
-            <span className="text-slate-500 block">Receita Estimada</span>
-            <span className="text-xs font-bold text-emerald-400 mt-0.5 block font-mono">{formatCurrency(totalValue)}</span>
-          </div>
-        </div>
-      </div>
+      <AgendaHeader
+        prevWeekDateStr={prevWeekDateStr}
+        nextWeekDateStr={nextWeekDateStr}
+        date={date}
+        view={view}
+        dateRangeStr={formatDateRange()}
+        lessonsCountSpan={
+          <span className="text-xs font-bold text-white mt-0.5 block">{weekLessons.length} Aulas</span>
+        }
+        durationSpan={
+          <span className="text-xs font-bold text-indigo-400 mt-0.5 block">{totalDuration} Horas</span>
+        }
+        valueSpan={
+          <span className="text-xs font-bold text-emerald-400 mt-0.5 block font-mono">{formatCurrency(totalValue)}</span>
+        }
+      />
 
       {/* Calendário Semanal Grid */}
       <div className="relative flex border border-slate-800 bg-slate-900/10 rounded-xl flex-1 min-h-0 overflow-auto scrollbar-thin scrollbar-thumb-slate-800/80">
@@ -423,10 +395,11 @@ export async function LessonsDataView({ view, period, date }: LessonsDataViewPro
                   {/* Cards de Aulas */}
                   {dayLessons.map((lesson) => {
                     const { top, height } = getPosition(lesson.startTime, lesson.durationHours)
-                    const isCompact = height < 70
+                    const isCompact = height < 50
                     return (
-                      <div
+                      <Link
                         key={lesson.id}
+                        href={`/dashboard/agenda?view=calendar&date=${date}&editLessonId=${lesson.id}`}
                         style={{
                           top: `${top}px`,
                           height: `${height}px`,
@@ -434,82 +407,21 @@ export async function LessonsDataView({ view, period, date }: LessonsDataViewPro
                           borderColor: lesson.subject.color,
                         }}
                         className={cn(
-                          "absolute left-1 right-1 rounded-lg border-l-4 border-y border-r border-slate-800/85 flex flex-col justify-between transition-all hover:scale-[1.01] hover:shadow-lg hover:shadow-indigo-950/20 hover:z-20 group z-10 select-none overflow-hidden",
+                          "absolute left-1 right-1 rounded-lg border-l-4 border-y border-r border-slate-800/85 flex flex-col justify-center transition-all hover:scale-[1.01] hover:shadow-lg hover:shadow-indigo-950/20 hover:z-20 group z-10 select-none overflow-hidden cursor-pointer",
                           isCompact ? "p-1" : "p-1.5"
                         )}
                       >
-                        {/* Status / Matéria e Ações Rápidas */}
-                        <div className="flex items-center justify-between gap-1 leading-none shrink-0">
-                          <span
-                            style={{ color: lesson.subject.color }}
-                            className="text-[9px] font-extrabold tracking-wide uppercase truncate"
-                          >
-                            {lesson.subject.name}
-                          </span>
-                          {isCompact && (
-                            <span className="text-[8px] text-slate-400 font-mono leading-none">
-                              {formatTime(lesson.startTime)}
-                            </span>
-                          )}
-                          <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 items-center shrink-0 z-20">
-                            <LessonStatusButton id={lesson.id} status={lesson.status} />
-                          </div>
-                        </div>
-
-                        {/* Aluno e Horário */}
-                        <Link
-                          href={`/dashboard/agenda?view=calendar&date=${date}&editLessonId=${lesson.id}`}
-                          className="flex-grow flex flex-col justify-center min-w-0"
-                        >
-                          <span className={cn(
-                            "text-xs font-bold text-slate-100 truncate block group-hover:text-white transition-colors leading-tight",
-                            lesson.status === 'CANCELADA' && 'line-through text-slate-500 font-medium'
-                          )}>
-                            {lesson.student.name}
-                          </span>
-                          {!isCompact && (
-                            <span className="text-[9px] text-slate-400 font-mono mt-0.5 flex items-center gap-0.5 leading-none">
-                              <Clock className="size-2.5 text-slate-500" />
-                              {formatTime(lesson.startTime)} ({lesson.durationHours}h)
-                            </span>
-                          )}
-                        </Link>
-
-                        {/* Rodapé: Modalidade e Recorrência */}
-                        {!isCompact && (
-                          <div className="flex items-center justify-between text-[9px] pt-1 border-t border-slate-800/40 text-slate-400 leading-none shrink-0">
-                            {lesson.modality === 'ONLINE' ? (
-                              <span className="text-sky-400 font-semibold flex items-center gap-0.5">
-                                <Video className="size-2.5" />
-                                Online
-                              </span>
-                            ) : (
-                              <span className="text-amber-400 font-semibold flex items-center gap-0.5">
-                                <MapPin className="size-2.5" />
-                                Presencial
-                              </span>
-                            )}
-                            
-                            <div className="flex items-center gap-1">
-                              {lesson.status === 'CONCLUIDA' ? (
-                                <span className="text-[8px] bg-emerald-950/50 text-emerald-450 border border-emerald-900/30 rounded px-1 font-bold">
-                                  Concl.
-                                </span>
-                              ) : lesson.status === 'CANCELADA' ? (
-                                <span className="text-[8px] bg-red-950/50 text-red-450 border border-red-900/30 rounded px-1 font-bold">
-                                  Cancel.
-                                </span>
-                              ) : null}
-
-                              {lesson.recurringScheduleId && (
-                                <span className="flex items-center" title="Aula Semanal Fixa">
-                                  <Repeat className="size-3 text-indigo-400 animate-pulse" />
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
+                        <span className={cn(
+                          "text-xs font-bold text-slate-100 truncate block group-hover:text-white transition-colors leading-tight",
+                          lesson.status === 'CANCELADA' && 'line-through text-slate-500 font-medium'
+                        )}>
+                          {lesson.student.name}
+                        </span>
+                        <span className="text-[9px] text-slate-400 font-mono mt-0.5 flex items-center gap-0.5 leading-none">
+                          <Clock className="size-2.5 text-slate-500" />
+                          {formatTime(lesson.startTime)} ({lesson.durationHours}h)
+                        </span>
+                      </Link>
                     )
                   })}
                 </div>

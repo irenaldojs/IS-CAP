@@ -13,7 +13,8 @@ import {
   deleteRecurringSchedule,
   checkLessonOverlap,
   checkRecurringScheduleOverlap,
-  checkRecurringScheduleUpdateOverlap
+  checkRecurringScheduleUpdateOverlap,
+  updateLessonStatus
 } from '@/actions/lessons'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -132,6 +133,7 @@ export function LessonDialog({
   // Assistir mudanças de aluno e duração para auto-preenchimento
   const watchedStudentId = watch('studentId')
   const watchedDurationTime = watch('durationTime')
+  const watchedStatus = watch('status')
 
   const selectedStudent = students.find(s => s.id === watchedStudentId)
 
@@ -370,6 +372,26 @@ export function LessonDialog({
       toast.error('Erro ao excluir.')
     } finally {
       setIsDeleting(false)
+    }
+  }
+
+  const handleQuickStatusChange = async (newStatus: string) => {
+    if (!editingLesson) return
+    setIsSubmitting(true)
+    try {
+      if (editingLesson.recurringScheduleId && editOption === 'SERIES') {
+        setValue('status', newStatus)
+        await handleSubmit(onSubmit)()
+      } else {
+        await updateLessonStatus(editingLesson.id, newStatus)
+        toast.success(`Status da aula atualizado para ${newStatus === 'CONCLUIDA' ? 'concluída' : newStatus === 'CANCELADA' ? 'cancelada' : 'agendada'}!`)
+        onClose()
+      }
+    } catch (error) {
+      console.error(error)
+      toast.error('Erro ao atualizar status da aula.')
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -658,7 +680,7 @@ export function LessonDialog({
           </div>
 
           {/* Footer Actions */}
-          <div className="flex items-center justify-between border-t border-slate-800 bg-slate-950/40 px-6 py-4">
+          <div className="flex items-center justify-between border-t border-slate-800 bg-slate-950/40 px-6 py-4 flex-wrap gap-3">
             <div>
               {editingLesson && (
                 <Button
@@ -678,7 +700,63 @@ export function LessonDialog({
               )}
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Botões Rápidos de Status */}
+              {editingLesson && (
+                <div className="flex items-center gap-1.5 mr-2">
+                  {watchedStatus === 'AGENDADA' && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleQuickStatusChange('CONCLUIDA')}
+                        disabled={isSubmitting || isDeleting}
+                        className="bg-emerald-950/40 text-emerald-450 border border-emerald-900/30 hover:bg-emerald-600 hover:text-white px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors disabled:opacity-50"
+                      >
+                        Concluir
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleQuickStatusChange('CANCELADA')}
+                        disabled={isSubmitting || isDeleting}
+                        className="bg-red-955/40 text-red-400 border border-red-900/30 hover:bg-red-650 hover:text-white px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors disabled:opacity-50"
+                      >
+                        Cancelar
+                      </button>
+                    </>
+                  )}
+                  {watchedStatus === 'CONCLUIDA' && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleQuickStatusChange('AGENDADA')}
+                        disabled={isSubmitting || isDeleting}
+                        className="bg-indigo-950/40 text-indigo-450 border border-indigo-900/30 hover:bg-indigo-600 hover:text-white px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors disabled:opacity-50"
+                      >
+                        Reabrir
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleQuickStatusChange('CANCELADA')}
+                        disabled={isSubmitting || isDeleting}
+                        className="bg-red-955/40 text-red-400 border border-red-900/30 hover:bg-red-650 hover:text-white px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors disabled:opacity-50"
+                      >
+                        Cancelar
+                      </button>
+                    </>
+                  )}
+                  {watchedStatus === 'CANCELADA' && (
+                    <button
+                      type="button"
+                      onClick={() => handleQuickStatusChange('AGENDADA')}
+                      disabled={isSubmitting || isDeleting}
+                      className="bg-indigo-950/40 text-indigo-450 border border-indigo-900/30 hover:bg-indigo-600 hover:text-white px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors disabled:opacity-50"
+                    >
+                      Reabrir
+                    </button>
+                  )}
+                </div>
+              )}
+
               <Button
                 type="button"
                 variant="outline"
