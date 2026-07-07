@@ -7,8 +7,8 @@ import {
   ArrowDownRight,
 } from 'lucide-react'
 
-export async function FinanceSummaryCards() {
-  const summary = await getFinancialSummary()
+export async function FinanceSummaryCards({ month, year }: { month?: number; year?: number }) {
+  const summary = await getFinancialSummary(month, year)
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {

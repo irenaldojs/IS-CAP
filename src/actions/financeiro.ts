@@ -14,7 +14,7 @@ export interface ExpenseInput {
 }
 
 // 1. Obter Resumo Financeiro
-export async function getFinancialSummary() {
+export async function getFinancialSummary(month?: number, year?: number) {
   const session = await auth()
   if (!session?.user?.id) {
     return {
@@ -27,14 +27,36 @@ export async function getFinancialSummary() {
 
   const userId = session.user.id
 
-  // Busca todos os pagamentos do usuário
+  // Filtros de data caso mês e ano sejam passados
+  let paymentWhereClause: any = { userId }
+  let expenseWhereClause: any = { userId }
+
+  if (month && year) {
+    const startDate = new Date(year, month - 1, 1)
+    const endDate = new Date(year, month, 1)
+
+    // Filtra pagamentos onde a aula ocorreu no mês/ano
+    paymentWhereClause.lesson = {
+      date: {
+        gte: startDate,
+        lt: endDate,
+      },
+    }
+
+    expenseWhereClause.date = {
+      gte: startDate,
+      lt: endDate,
+    }
+  }
+
+  // Busca pagamentos do usuário
   const payments = await prisma.payment.findMany({
-    where: { userId },
+    where: paymentWhereClause,
   })
 
-  // Busca todas as despesas do usuário
+  // Busca despesas do usuário
   const expenses = await prisma.expense.findMany({
-    where: { userId },
+    where: expenseWhereClause,
   })
 
   const totalPaid = payments
@@ -192,3 +214,73 @@ export async function deleteExpense(id: string) {
   revalidatePath('/dashboard')
   return expense
 }
+
+// 7. Obter Balanço Mensal
+export async function getMonthlyBalance() {
+  const session = await auth()
+  if (!session?.user?.id) return []
+
+  const userId = session.user.id
+
+  const payments = await prisma.payment.findMany({
+    where: { userId },
+    include: {
+      lesson: {
+        select: {
+          date: true,
+        },
+      },
+    },
+  })
+
+  const expenses = await prisma.expense.findMany({
+    where: { userId },
+  })
+
+  const monthlyData: Record<
+    string,
+    {
+      year: number
+      month: number
+      revenuesPaid: number
+      revenuesPending: number
+      expenses: number
+    }
+  > = {}
+
+  payments.forEach((p) => {
+    const date = new Date(p.lesson.date)
+    const year = date.getFullYear()
+    const month = date.getMonth() + 1
+    const key = `${year}-${String(month).padStart(2, '0')}`
+
+    if (!monthlyData[key]) {
+      monthlyData[key] = { year, month, revenuesPaid: 0, revenuesPending: 0, expenses: 0 }
+    }
+
+    if (p.isPaid) {
+      monthlyData[key].revenuesPaid += p.amount
+    } else {
+      monthlyData[key].revenuesPending += p.amount
+    }
+  })
+
+  expenses.forEach((e) => {
+    const date = new Date(e.date)
+    const year = date.getFullYear()
+    const month = date.getMonth() + 1
+    const key = `${year}-${String(month).padStart(2, '0')}`
+
+    if (!monthlyData[key]) {
+      monthlyData[key] = { year, month, revenuesPaid: 0, revenuesPending: 0, expenses: 0 }
+    }
+
+    monthlyData[key].expenses += e.amount
+  })
+
+  return Object.values(monthlyData).sort((a, b) => {
+    if (a.year !== b.year) return b.year - a.year
+    return b.month - a.month
+  })
+}
+

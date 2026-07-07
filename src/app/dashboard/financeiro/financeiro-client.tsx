@@ -14,6 +14,8 @@ import {
   Plus,
   Loader2,
   X,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 
 // Validação de despesas com Zod
@@ -31,15 +33,21 @@ const expenseFormSchema = z.object({
 type ExpenseFormValues = z.infer<typeof expenseFormSchema>
 
 interface FinanceiroClientProps {
-  tab: 'receitas' | 'despesas'
+  tab: 'mensal' | 'geral'
+  subTab: 'receitas' | 'despesas'
   summaryCards: React.ReactNode
   children: React.ReactNode
+  month: number
+  year: number
 }
 
 export function FinanceiroClient({
   tab,
+  subTab,
   summaryCards,
   children,
+  month,
+  year,
 }: FinanceiroClientProps) {
   const router = useRouter()
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -61,8 +69,47 @@ export function FinanceiroClient({
     },
   })
 
-  const handleTabChange = (newTab: 'receitas' | 'despesas') => {
-    router.push(`/dashboard/financeiro?tab=${newTab}`)
+  const monthNames = [
+    'Janeiro',
+    'Fevereiro',
+    'Março',
+    'Abril',
+    'Maio',
+    'Junho',
+    'Julho',
+    'Agosto',
+    'Setembro',
+    'Outubro',
+    'Novembro',
+    'Dezembro',
+  ]
+
+  const handlePrevMonth = () => {
+    let newMonth = month - 1
+    let newYear = year
+    if (newMonth < 1) {
+      newMonth = 12
+      newYear = year - 1
+    }
+    router.push(`/dashboard/financeiro?tab=${tab}&subTab=${subTab}&month=${newMonth}&year=${newYear}`)
+  }
+
+  const handleNextMonth = () => {
+    let newMonth = month + 1
+    let newYear = year
+    if (newMonth > 12) {
+      newMonth = 1
+      newYear = year + 1
+    }
+    router.push(`/dashboard/financeiro?tab=${tab}&subTab=${subTab}&month=${newMonth}&year=${newYear}`)
+  }
+
+  const handleTabChange = (newTab: 'mensal' | 'geral') => {
+    router.push(`/dashboard/financeiro?tab=${newTab}&subTab=${subTab}&month=${month}&year=${year}`)
+  }
+
+  const handleSubTabChange = (newSubTab: 'receitas' | 'despesas') => {
+    router.push(`/dashboard/financeiro?tab=mensal&subTab=${newSubTab}&month=${month}&year=${year}`)
   }
 
   const onSubmitExpense = async (values: ExpenseFormValues) => {
@@ -79,7 +126,7 @@ export function FinanceiroClient({
       toast.success('Despesa cadastrada com sucesso!')
       setIsDialogOpen(false)
       reset()
-      router.refresh() // Recarrega os Server Components na tela com os novos dados
+      router.refresh()
     } catch (error) {
       console.error(error)
       toast.error('Erro ao cadastrar despesa.')
@@ -108,32 +155,83 @@ export function FinanceiroClient({
         </Button>
       </div>
 
-      {/* Cards de Resumo Financeiro */}
-      {summaryCards}
-
-      {/* Tabs */}
-      <div className="flex border-b border-slate-800 bg-slate-900/40 p-1 rounded-xl max-w-xs">
+      {/* Main Tabs (Balanço do Mês / Balanço Geral) */}
+      <div className="flex border-b border-slate-800 bg-slate-900/40 p-1 rounded-xl max-w-sm">
         <button
-          onClick={() => handleTabChange('receitas')}
+          onClick={() => handleTabChange('mensal')}
           className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all cursor-pointer ${
-            tab === 'receitas'
+            tab === 'mensal'
               ? 'bg-indigo-600 text-white shadow'
               : 'text-slate-400 hover:text-slate-200'
           }`}
         >
-          Receitas (Aulas)
+          Balanço do Mês
         </button>
         <button
-          onClick={() => handleTabChange('despesas')}
+          onClick={() => handleTabChange('geral')}
           className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all cursor-pointer ${
-            tab === 'despesas'
+            tab === 'geral'
               ? 'bg-indigo-600 text-white shadow'
               : 'text-slate-400 hover:text-slate-200'
           }`}
         >
-          Despesas (Gastos)
+          Balanço Geral
         </button>
       </div>
+
+      {/* Condicional do Balanço do Mês: exibe cards, seletor de mês e sub-abas */}
+      {tab === 'mensal' && (
+        <div className="space-y-6">
+          {/* Cards de Resumo Financeiro */}
+          {summaryCards}
+
+          {/* Sub-Tabs (Receitas / Despesas) & Month Selector */}
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex border-b border-slate-800 bg-slate-900/40 p-1 rounded-xl max-w-xs w-full sm:w-auto">
+              <button
+                onClick={() => handleSubTabChange('receitas')}
+                className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all cursor-pointer px-4 ${
+                  subTab === 'receitas'
+                    ? 'bg-indigo-600 text-white shadow'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Receitas
+              </button>
+              <button
+                onClick={() => handleSubTabChange('despesas')}
+                className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all cursor-pointer px-4 ${
+                  subTab === 'despesas'
+                    ? 'bg-indigo-600 text-white shadow'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Despesas
+              </button>
+            </div>
+
+            <div className="flex items-center gap-4 bg-slate-900/40 border border-slate-800 rounded-xl px-4 py-1.5 self-start sm:self-auto shadow-md">
+              <button
+                type="button"
+                onClick={handlePrevMonth}
+                className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer"
+              >
+                <ChevronLeft className="size-5" />
+              </button>
+              <span className="text-sm font-semibold text-slate-200 min-w-[140px] text-center font-mono">
+                {monthNames[month - 1]} / {year}
+              </span>
+              <button
+                type="button"
+                onClick={handleNextMonth}
+                className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer"
+              >
+                <ChevronRight className="size-5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* TAB CONTENT */}
       {children}

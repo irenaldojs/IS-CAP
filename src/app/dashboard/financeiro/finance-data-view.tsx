@@ -1,20 +1,26 @@
-import { getPayments, getExpenses } from '@/actions/financeiro'
+import { getPayments, getExpenses, getMonthlyBalance } from '@/actions/financeiro'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { TogglePaymentButton } from './toggle-payment-button'
 import { DeleteExpenseButton } from './delete-expense-button'
+import Link from 'next/link'
 import {
   DollarSign,
   CheckCircle,
   Clock,
   Layers,
+  Scale,
+  TrendingUp,
+  Eye,
 } from 'lucide-react'
 
 interface FinanceDataViewProps {
-  tab: 'receitas' | 'despesas'
+  tab: 'receitas' | 'despesas' | 'geral'
+  month: number
+  year: number
 }
 
-export async function FinanceDataView({ tab }: FinanceDataViewProps) {
+export async function FinanceDataView({ tab, month, year }: FinanceDataViewProps) {
   // Formatadores de UI
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -32,7 +38,11 @@ export async function FinanceDataView({ tab }: FinanceDataViewProps) {
   }
 
   if (tab === 'receitas') {
-    const payments = await getPayments()
+    const allPayments = await getPayments()
+    const payments = allPayments.filter((p) => {
+      const d = new Date(p.lesson.date)
+      return d.getFullYear() === year && d.getMonth() + 1 === month
+    })
 
     return (
       <Card className="border-slate-800 bg-slate-900/20 backdrop-blur-md">
@@ -125,8 +135,125 @@ export async function FinanceDataView({ tab }: FinanceDataViewProps) {
     )
   }
 
+  if (tab === 'geral') {
+    const monthlyBalance = await getMonthlyBalance()
+    const monthNames = [
+      'Janeiro',
+      'Fevereiro',
+      'Março',
+      'Abril',
+      'Maio',
+      'Junho',
+      'Julho',
+      'Agosto',
+      'Setembro',
+      'Outubro',
+      'Novembro',
+      'Dezembro',
+    ]
+
+    return (
+      <Card className="border-slate-800 bg-slate-900/20 backdrop-blur-md">
+        <CardHeader>
+          <CardTitle className="text-lg font-semibold text-slate-200">Balanço Geral Consolidado</CardTitle>
+          <CardDescription className="text-slate-400">
+            Histórico de fechamento de cada mês. Clique em "Detalhar" ou no mês desejado para visualizar as receitas e despesas correspondentes.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          {monthlyBalance.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <Scale className="size-12 text-slate-700 mb-3" />
+              <h3 className="font-semibold text-slate-300">Nenhum dado financeiro encontrado</h3>
+              <p className="text-slate-500 text-sm mt-1 max-w-xs">
+                Registre receitas (aulas) ou despesas para gerar o balanço mensal.
+              </p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader className="bg-slate-950/40 border-b border-slate-800">
+                <TableRow className="border-slate-800">
+                  <TableHead className="pl-6 py-3.5 text-slate-400 font-medium">Mês / Ano</TableHead>
+                  <TableHead className="py-3.5 text-slate-400 font-medium">Receitas Realizadas</TableHead>
+                  <TableHead className="py-3.5 text-slate-400 font-medium">Receitas Pendentes</TableHead>
+                  <TableHead className="py-3.5 text-slate-400 font-medium">Despesas</TableHead>
+                  <TableHead className="py-3.5 text-slate-400 font-medium">Saldo Realizado</TableHead>
+                  <TableHead className="py-3.5 text-slate-400 font-medium">Saldo Projetado</TableHead>
+                  <TableHead className="pr-6 py-3.5 text-right text-slate-400 font-medium">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {monthlyBalance.map((item) => {
+                  const netRealized = item.revenuesPaid - item.expenses
+                  const netProjected = item.revenuesPaid + item.revenuesPending - item.expenses
+
+                  return (
+                    <TableRow key={`${item.year}-${item.month}`} className="border-slate-800 hover:bg-slate-900/30">
+                      {/* Mês / Ano */}
+                      <TableCell className="pl-6 py-4 font-semibold text-slate-200">
+                        <Link
+                          href={`/dashboard/financeiro?tab=mensal&month=${item.month}&year=${item.year}`}
+                          className="hover:text-indigo-400 hover:underline transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+                        >
+                          {monthNames[item.month - 1]} / {item.year}
+                        </Link>
+                      </TableCell>
+
+                      {/* Receitas Realizadas */}
+                      <TableCell className="py-4 font-mono text-emerald-400">
+                        {formatCurrency(item.revenuesPaid)}
+                      </TableCell>
+
+                      {/* Receitas Pendentes */}
+                      <TableCell className="py-4 font-mono text-amber-400">
+                        {formatCurrency(item.revenuesPending)}
+                      </TableCell>
+
+                      {/* Despesas */}
+                      <TableCell className="py-4 font-mono text-rose-400">
+                        -{formatCurrency(item.expenses)}
+                      </TableCell>
+
+                      {/* Saldo Realizado */}
+                      <TableCell className="py-4 font-mono">
+                        <span className={netRealized >= 0 ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
+                          {formatCurrency(netRealized)}
+                        </span>
+                      </TableCell>
+
+                      {/* Saldo Projetado */}
+                      <TableCell className="py-4 font-mono">
+                        <span className={netProjected >= 0 ? 'text-indigo-400 font-bold' : 'text-rose-450 font-bold'}>
+                          {formatCurrency(netProjected)}
+                        </span>
+                      </TableCell>
+
+                      {/* Ações (Redirecionar para Balanço do Mês) */}
+                      <TableCell className="pr-6 py-4 text-right">
+                        <Link
+                          href={`/dashboard/financeiro?tab=mensal&month=${item.month}&year=${item.year}`}
+                          className="inline-flex items-center gap-1 text-xs font-semibold bg-slate-800 hover:bg-indigo-600 text-slate-200 hover:text-white px-2.5 py-1.5 rounded-lg border border-slate-700 transition-all cursor-pointer shadow-sm"
+                        >
+                          <Eye className="size-3.5" /> Detalhar
+                        </Link>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    )
+  }
+
   // Se a aba for despesas
-  const expenses = await getExpenses()
+  const allExpenses = await getExpenses()
+  const expenses = allExpenses.filter((e) => {
+    const d = new Date(e.date)
+    return d.getFullYear() === year && d.getMonth() + 1 === month
+  })
 
   return (
     <Card className="border-slate-800 bg-slate-900/20 backdrop-blur-md">
@@ -140,7 +267,7 @@ export async function FinanceDataView({ tab }: FinanceDataViewProps) {
         {expenses.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <Layers className="size-12 text-slate-700 mb-3" />
-            <h3 className="font-semibold text-slate-300">Nenhuma despesa registrada</h3>
+            <h3 className="font-semibold text-slate-300">Nenhum despesa registrada</h3>
             <p className="text-slate-500 text-sm mt-1 max-w-xs">
               Cadastre sua primeira despesa clicando no botão no topo da página.
             </p>
