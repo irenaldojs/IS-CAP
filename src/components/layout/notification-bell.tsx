@@ -9,6 +9,7 @@ import {
   markNotificationAsRead,
   markAllNotificationsAsRead,
   deleteNotification as apiDeleteNotification,
+  deleteAllNotifications,
   type NotificationDto as Notification
 } from "@/actions/notifications"
 import { toast } from "sonner"
@@ -100,6 +101,19 @@ export default function NotificationBell() {
     }
   }
 
+  const clearAllNotifications = async () => {
+    // Atualização otimista
+    setNotifications([])
+    try {
+      await deleteAllNotifications()
+      toast.success("Todas as notificações foram excluídas.")
+    } catch (err) {
+      console.error(err)
+      toast.error("Erro ao excluir notificações.")
+      loadNotifications() // Reverte
+    }
+  }
+
   const getIcon = (type: Notification["type"]) => {
     switch (type) {
       case "calendar":
@@ -140,15 +154,28 @@ export default function NotificationBell() {
           {/* Header */}
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <span className="font-semibold text-sm">Notificações</span>
-            {unreadCount > 0 && (
-              <button
-                onClick={markAllAsRead}
-                className="text-xs text-primary hover:underline font-medium flex items-center gap-1 cursor-pointer"
-              >
-                <Check className="size-3.5" />
-                Marcar todas como lidas
-              </button>
-            )}
+            <div className="flex items-center gap-3">
+              {unreadCount > 0 && (
+                <button
+                  onClick={markAllAsRead}
+                  className="text-xs text-primary hover:underline font-medium flex items-center gap-1 cursor-pointer"
+                  title="Marcar todas como lidas"
+                >
+                  <Check className="size-3.5" />
+                  Ler todas
+                </button>
+              )}
+              {notifications.length > 0 && (
+                <button
+                  onClick={clearAllNotifications}
+                  className="text-xs text-muted-foreground hover:text-destructive hover:underline font-medium flex items-center gap-1 cursor-pointer"
+                  title="Excluir todas as notificações"
+                >
+                  <Trash2 className="size-3.5" />
+                  Limpar tudo
+                </button>
+              )}
+            </div>
           </div>
 
           {/* List */}

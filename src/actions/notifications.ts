@@ -111,6 +111,24 @@ export async function deleteNotification(id: string) {
   }
 }
 
+// Excluir todas as notificações do usuário logado
+export async function deleteAllNotifications() {
+  const session = await auth()
+  if (!session?.user?.id) throw new Error('Não autorizado')
+
+  try {
+    await prisma.notification.deleteMany({
+      where: {
+        userId: session.user.id,
+      },
+    })
+    revalidatePath('/dashboard')
+  } catch (error) {
+    console.error('[Server Action] Erro ao excluir todas as notificações:', error)
+    throw new Error('Erro ao excluir todas as notificações')
+  }
+}
+
 // Função utilitária interna para criar notificações (chamada do lado do servidor)
 export async function createNotification(
   userId: string,
