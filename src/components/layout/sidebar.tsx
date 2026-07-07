@@ -89,10 +89,6 @@ export default function Sidebar() {
                 </span>
               </div>
 
-              {/* Active Indicator Bar on Left */}
-              {isActive && (
-                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-md bg-primary" />
-              )}
             </Link>
           )
         })}
