@@ -107,7 +107,7 @@ export function AgendaClient({
   return (
     <div className="flex flex-col h-full min-h-0 space-y-4 overflow-hidden">
       {/* Barra de Filtros e Visualização */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-slate-900/40 p-2 rounded-xl border border-slate-800/80 backdrop-blur-md shrink-0">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-slate-900/40 p-2 rounded-xl border border-slate-800/80 backdrop-blur-md shrink-0">
         
         {/* Abas */}
         <div className="flex gap-1.5 p-1 bg-slate-950/80 rounded-lg border border-slate-800/40 w-full sm:w-auto">
@@ -149,6 +149,14 @@ export function AgendaClient({
           </button>
         </div>
 
+        <Button
+          onClick={() => setIsDialogOpen(true)}
+          size="sm"
+          className="bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer shadow-md shadow-indigo-600/15 text-xs h-9 px-4 rounded-lg w-full sm:w-auto shrink-0"
+        >
+          <Plus className="mr-1.5 size-3.5" />
+          Agendar Aula
+        </Button>
       </div>
 
       {/* ÁREA PRINCIPAL: LISTA OU CALENDÁRIO */}
