@@ -1,4 +1,4 @@
-const CACHE_NAME = 'is-cap-v1'
+const CACHE_NAME = 'is-cap-v2'
 
 // Assets estáticos para cache (shell da aplicação)
 const STATIC_ASSETS = [
