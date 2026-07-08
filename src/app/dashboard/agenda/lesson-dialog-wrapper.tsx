@@ -1,7 +1,16 @@
 'use client'
 
-import { LessonDialog } from './lesson-dialog'
+import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
+
+const LessonDialog = dynamic(() => import('./lesson-dialog').then(mod => mod.LessonDialog), {
+  ssr: false,
+  loading: () => (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="size-8 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
+    </div>
+  ),
+})
 
 interface LessonDialogWrapperProps {
   lesson: any

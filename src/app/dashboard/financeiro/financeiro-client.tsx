@@ -180,15 +180,33 @@ export function FinanceiroClient({
   }
 
   return (
-    <div className="space-y-6">
-      {/* Cabeçalho */}
+    <div className="space-y-4">
+      {/* Cabeçalho e Abas Principais */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white">Controle Financeiro</h1>
-          <p className="text-muted-foreground mt-1">
-            Acompanhe o faturamento de suas aulas, controle pagamentos recebidos e gerencie despesas de ensino.
-          </p>
+        {/* Main Tabs (Balanço do Mês / Balanço Geral) */}
+        <div className="flex border-b border-slate-800 bg-slate-900/40 p-1 rounded-xl max-w-sm w-full sm:w-auto">
+          <button
+            onClick={() => handleTabChange('mensal')}
+            className={`flex-1 py-2 px-2 text-center whitespace-nowrap sm:w-44 text-sm font-medium rounded-lg transition-all cursor-pointer ${
+              tab === 'mensal'
+                ? 'bg-indigo-600 text-white shadow'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            Balanço do Mês
+          </button>
+          <button
+            onClick={() => handleTabChange('geral')}
+            className={`flex-1 py-2 px-2 text-center whitespace-nowrap sm:w-44 text-sm font-medium rounded-lg transition-all cursor-pointer ${
+              tab === 'geral'
+                ? 'bg-indigo-600 text-white shadow'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            Balanço Geral
+          </button>
         </div>
+
         <div className="flex flex-wrap items-center gap-3">
           {/* Valor Hora Base Widget */}
           <div className="flex items-center gap-2 bg-slate-900/60 border border-slate-800 rounded-xl px-3.5 py-1.5 shadow-md">
@@ -259,34 +277,10 @@ export function FinanceiroClient({
         </div>
       </div>
 
-      {/* Main Tabs (Balanço do Mês / Balanço Geral) */}
-      <div className="flex border-b border-slate-800 bg-slate-900/40 p-1 rounded-xl max-w-sm">
-        <button
-          onClick={() => handleTabChange('mensal')}
-          className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all cursor-pointer ${
-            tab === 'mensal'
-              ? 'bg-indigo-600 text-white shadow'
-              : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          Balanço do Mês
-        </button>
-        <button
-          onClick={() => handleTabChange('geral')}
-          className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all cursor-pointer ${
-            tab === 'geral'
-              ? 'bg-indigo-600 text-white shadow'
-              : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          Balanço Geral
-        </button>
-      </div>
-
 
       {/* Condicional do Balanço do Mês: exibe cards, seletor de mês e sub-abas */}
       {tab === 'mensal' && (
-        <div className="space-y-6">
+        <div className="space-y-4">
           {/* Cards de Resumo Financeiro */}
           {summaryCards}
 

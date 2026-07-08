@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useRef, useEffect } from "react"
+import React, { useState, useRef, useEffect, useCallback } from "react"
 import { Bell, Check, Trash2, BellOff, Info, Calendar, DollarSign, BookOpen } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -22,14 +22,14 @@ export default function NotificationBell() {
   const unreadCount = notifications.filter((n) => !n.read).length
 
   // Carregar notificações do banco de dados
-  const loadNotifications = async () => {
+  const loadNotifications = useCallback(async () => {
     try {
       const data = await getNotifications()
       setNotifications(data)
     } catch (err) {
       console.error("Erro ao buscar notificações:", err)
     }
-  }
+  }, [])
 
   // Carregar inicialmente e quando o dropdown for aberto
   useEffect(() => {

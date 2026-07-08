@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useCallback, useRef } from "react"
 import { X, Loader2, User, Mail, Calendar, DollarSign, Save } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -23,21 +23,33 @@ export default function UserProfileDialog({ isOpen, onClose }: UserProfileDialog
     createdAt: Date | string;
   } | null>(null)
 
+  // Cache do perfil para evitar re-fetch desnecessário
+  const profileCacheRef = useRef<typeof userData>(null)
+
   // Carregar os dados do perfil quando abrir a dialog
   useEffect(() => {
     if (!isOpen) return
+
+    // Se já tem cache, usa direto sem buscar no servidor
+    if (profileCacheRef.current) {
+      setUserData(profileCacheRef.current)
+      setIsLoading(false)
+      return
+    }
 
     const loadProfile = async () => {
       setIsLoading(true)
       try {
         const response = await getUserProfile()
         if (response.success && response.user) {
-          setUserData({
+          const data = {
             name: response.user.name,
             email: response.user.email,
             defaultHourlyRate: response.user.defaultHourlyRate,
             createdAt: response.user.createdAt,
-          })
+          }
+          setUserData(data)
+          profileCacheRef.current = data
         } else {
           toast.error(response.error || "Erro ao carregar perfil.")
           onClose()
@@ -65,7 +77,7 @@ export default function UserProfileDialog({ isOpen, onClose }: UserProfileDialog
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [isOpen, onClose])
 
-  const handleSave = async (e: React.FormEvent) => {
+  const handleSave = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
     if (!userData) return
 
@@ -77,6 +89,8 @@ export default function UserProfileDialog({ isOpen, onClose }: UserProfileDialog
       })
       if (response.success) {
         toast.success("Perfil atualizado com sucesso!")
+        // Invalida o cache para que próxima abertura busque dados atualizados
+        profileCacheRef.current = null
         onClose()
       } else {
         toast.error(response.error || "Erro ao salvar perfil.")
@@ -87,7 +101,7 @@ export default function UserProfileDialog({ isOpen, onClose }: UserProfileDialog
     } finally {
       setIsSaving(false)
     }
-  }
+  }, [userData, onClose])
 
   // Format date helper
   const formatDate = (dateInput: Date | string) => {

@@ -1,4 +1,5 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
+import Script from 'next/script'
 import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 import { SessionProvider } from 'next-auth/react'
@@ -14,11 +15,25 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 })
 
+export const viewport: Viewport = {
+  themeColor: '#4f46e5',
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+}
+
 export const metadata: Metadata = {
   title: 'IS-CAP — Controle de Aulas Particulares',
   description: 'Sistema completo para gestão de alunos, agenda, finanças e materiais didáticos.',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'IS-CAP',
+  },
   icons: {
     icon: '/icon.svg',
+    apple: '/icons/apple-touch-icon.png',
   },
 }
 
@@ -37,6 +52,18 @@ export default function RootLayout({
           {children}
           <Toaster richColors position="top-right" closeButton />
         </SessionProvider>
+        <Script
+          id="sw-register"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/sw.js', { scope: '/' })
+                  .catch(function(err) { console.warn('SW registration failed:', err) })
+              }
+            `,
+          }}
+        />
       </body>
     </html>
   )

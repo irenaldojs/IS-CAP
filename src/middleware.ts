@@ -27,8 +27,8 @@ export default auth((req) => {
 })
 
 export const config = {
-  // Protege todas as rotas exceto arquivos estáticos, imagens e APIs
+  // Protege todas as rotas exceto arquivos estáticos, imagens, APIs e service worker
   matcher: [
-    '/((?!api|_next/static|_next/image|favicon.ico|.*\\..*).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|sw.js|icons|.*\\..*).*)',
   ],
 }

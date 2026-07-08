@@ -27,7 +27,7 @@ export default async function DashboardLayout({
         <Header />
 
         {/* Corpo da página com scroll independente */}
-        <main className="flex-1 overflow-y-auto bg-slate-950/40 p-4 md:p-6 lg:p-8">
+        <main className="flex-1 overflow-y-auto bg-slate-950/40 p-2 md:p-4 lg:p-6">
           <div className="mx-auto max-w-7xl">
             {children}
           </div>

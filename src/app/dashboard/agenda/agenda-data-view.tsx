@@ -365,37 +365,91 @@ export async function LessonsDataView({ view, period, date }: LessonsDataViewPro
                   })}
 
                   {/* Cards de Aulas */}
-                  {dayLessons.map((lesson) => {
-                    const { top, height } = getPosition(lesson.startTime, lesson.durationHours)
-                    const isCompact = height < 50
-                    return (
-                      <Link
-                        key={lesson.id}
-                        href={`/dashboard/agenda?view=calendar&date=${date}&editLessonId=${lesson.id}`}
-                        style={{
-                          top: `${top}px`,
-                          height: `${height}px`,
-                          backgroundColor: `${lesson.subject.color}15`,
-                          borderColor: lesson.subject.color,
-                        }}
-                        className={cn(
-                          "absolute left-1 right-1 rounded-lg border-l-4 border-y border-r border-slate-800/85 flex flex-col justify-center transition-all hover:scale-[1.01] hover:shadow-lg hover:shadow-indigo-950/20 hover:z-20 group z-10 select-none overflow-hidden cursor-pointer",
-                          isCompact ? "p-1" : "p-1.5"
-                        )}
-                      >
-                        <span className={cn(
-                          "text-xs font-bold text-slate-100 truncate block group-hover:text-white transition-colors leading-tight",
-                          lesson.status === 'CANCELADA' && 'line-through text-slate-500 font-medium'
-                        )}>
-                          {lesson.student.name}
-                        </span>
-                        <span className="text-[9px] text-slate-400 font-mono mt-0.5 flex items-center gap-0.5 leading-none">
-                          <Clock className="size-2.5 text-slate-500" />
-                          {formatTime(lesson.startTime)} ({lesson.durationHours}h)
-                        </span>
-                      </Link>
-                    )
-                  })}
+                  {(() => {
+                    const dayLessonsWithTimes = dayLessons.map(lesson => {
+                      const startTime = getTzDate(lesson.startTime)
+                      const start = startTime.getHours() + startTime.getMinutes() / 60
+                      const end = start + lesson.durationHours
+                      return { ...lesson, start, end }
+                    }).sort((a, b) => a.start - b.start || b.end - a.end)
+
+                    const groups: typeof dayLessonsWithTimes[] = []
+                    for (const lesson of dayLessonsWithTimes) {
+                      let placed = false
+                      for (const group of groups) {
+                        const overlaps = group.some(item => lesson.start < item.end && lesson.end > item.start)
+                        if (overlaps) {
+                          group.push(lesson)
+                          placed = true
+                          break
+                        }
+                      }
+                      if (!placed) {
+                        groups.push([lesson])
+                      }
+                    }
+
+                    const lessonPositions = new Map<string, { col: number; totalCols: number }>()
+                    for (const group of groups) {
+                      const columns: typeof dayLessonsWithTimes[] = []
+                      for (const lesson of group) {
+                        let colIdx = 0
+                        while (true) {
+                          if (!columns[colIdx]) {
+                            columns[colIdx] = []
+                          }
+                          const colOverlaps = columns[colIdx].some(item => lesson.start < item.end && lesson.end > item.start)
+                          if (!colOverlaps) {
+                            columns[colIdx].push(lesson)
+                            break
+                          }
+                          colIdx++
+                        }
+                      }
+                      for (const lesson of group) {
+                        const colIdx = columns.findIndex(col => col.includes(lesson))
+                        lessonPositions.set(lesson.id, { col: colIdx, totalCols: columns.length })
+                      }
+                    }
+
+                    return dayLessonsWithTimes.map((lesson) => {
+                      const { top, height } = getPosition(lesson.startTime, lesson.durationHours)
+                      const isCompact = height < 50
+                      const pos = lessonPositions.get(lesson.id) || { col: 0, totalCols: 1 }
+                      const widthPercent = 100 / pos.totalCols
+                      const leftPercent = pos.col * widthPercent
+
+                      return (
+                        <Link
+                          key={lesson.id}
+                          href={`/dashboard/agenda?view=calendar&date=${date}&editLessonId=${lesson.id}`}
+                          style={{
+                            top: `${top}px`,
+                            height: `${height}px`,
+                            left: `calc(${leftPercent}% + 4px)`,
+                            width: `calc(${widthPercent}% - 8px)`,
+                            backgroundColor: `${lesson.subject.color}15`,
+                            borderColor: lesson.subject.color,
+                          }}
+                          className={cn(
+                            "absolute rounded-lg border-l-4 border-y border-r border-slate-800/85 flex flex-col justify-center transition-all hover:scale-[1.01] hover:shadow-lg hover:shadow-indigo-950/20 hover:z-20 group z-10 select-none overflow-hidden cursor-pointer",
+                            isCompact ? "p-1" : "p-1.5"
+                          )}
+                        >
+                          <span className={cn(
+                            "text-xs font-bold text-slate-100 truncate block group-hover:text-white transition-colors leading-tight",
+                            lesson.status === 'CANCELADA' && 'line-through text-slate-500 font-medium'
+                          )}>
+                            {lesson.student.name}
+                          </span>
+                          <span className="text-[9px] text-slate-400 font-mono mt-0.5 flex items-center gap-0.5 leading-none">
+                            <Clock className="size-2.5 text-slate-500" />
+                            {formatTime(lesson.startTime)} ({lesson.durationHours}h)
+                          </span>
+                        </Link>
+                      )
+                    })
+                  })()}
                 </div>
               </div>
             )
